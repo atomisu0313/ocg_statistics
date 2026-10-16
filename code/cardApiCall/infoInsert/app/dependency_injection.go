@@ -22,7 +22,7 @@ func SetupDIContainer() *do.Injector {
 	do.Provide(injector, neuron.NewNeuronUseCase)
 	do.Provide(injector, tcgapi.NewTcgUseCase)
 	do.Provide(injector, neon.NewNeonUseCase)
-	do.Provide(injector, master.NewMasterUseCase)
+	do.Provide(injector, master.NewMasterUseCaseForDI)
 
 	// ハンドラー
 	//do.Provide(injector, handler.NewAccountHandler)

@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"atomisu.com/ocg-statics/infoInsert/dto/cardrecord"
-	"atomisu.com/ocg-statics/infoInsert/usecase"
 	"atomisu.com/ocg-statics/infoInsert/usecase/neon"
 	"atomisu.com/ocg-statics/infoInsert/usecase/neuron"
 	"atomisu.com/ocg-statics/infoInsert/usecase/tcgapi"
@@ -26,15 +25,37 @@ type MasterUseCase interface {
 	InsertCardInfoList(ctx context.Context, startId int64, delta int64) ([]int64, error)
 }
 
-// NewMasterUseCase は、MasterUseCaseのコンストラクタです。
-func NewMasterUseCase(i *do.Injector) (MasterUseCase, error) {
-	return usecase.NewUseCase(i, func(u *usecase.UseCaseImpl) MasterUseCase {
-		return &masterUseCaseImpl{
-			neuronUseCase: do.MustInvoke[neuron.NeuronUseCase](i),
-			tcgapiUseCase: do.MustInvoke[tcgapi.TcgUseCase](i),
-			neonUseCase:   do.MustInvoke[neon.NeonUseCase](i),
-		}
-	})
+// NewMasterUseCase は、MasterUseCaseの純粋なコンストラクタです（Pure DI）。
+// コンテナ（*do.Injector）に依存せず、必要なインターフェースのみを直接受け取ります。
+func NewMasterUseCase(
+	neuronUC neuron.NeuronUseCase,
+	tcgapiUC tcgapi.TcgUseCase,
+	neonUC neon.NeonUseCase,
+) MasterUseCase {
+	return &masterUseCaseImpl{
+		neuronUseCase: neuronUC,
+		tcgapiUseCase: tcgapiUC,
+		neonUseCase:   neonUC,
+	}
+}
+
+// NewMasterUseCaseForDI は、samber/do DIコンテナ用のプロバイダ関数です。
+// コンテナから必要な依存関係を取り出して純粋コンストラクタに渡します。
+func NewMasterUseCaseForDI(i *do.Injector) (MasterUseCase, error) {
+	neuronUC, err := do.Invoke[neuron.NeuronUseCase](i)
+	if err != nil {
+		return nil, err
+	}
+	tcgapiUC, err := do.Invoke[tcgapi.TcgUseCase](i)
+	if err != nil {
+		return nil, err
+	}
+	neonUC, err := do.Invoke[neon.NeonUseCase](i)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewMasterUseCase(neuronUC, tcgapiUC, neonUC), nil
 }
 
 func (m *masterUseCaseImpl) InsertCardInfo(ctx context.Context, neuronCardID int64) (int64, error) {
