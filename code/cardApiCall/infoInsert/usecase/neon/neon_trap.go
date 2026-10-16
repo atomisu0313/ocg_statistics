@@ -14,9 +14,7 @@ func (n *neonUseCaseImpl) InsertTrapCardInfo(ctx context.Context, cardInfo cardr
 
 	tr := transaction.NewTx(n.ProduceConnDB())
 
-	result := int64(0)
-
-	err := tr.ExecTx(ctx, func(q *sqlc_gen.Queries) error {
+	return transaction.ExecTx(ctx, tr, func(q *sqlc_gen.Queries) (int64, error) {
 		// リポジトリの準備
 		cardRepo := repository.NewCardRepository(q)
 		trapRepo := repository.NewTrapRepository(q)
@@ -25,27 +23,24 @@ func (n *neonUseCaseImpl) InsertTrapCardInfo(ctx context.Context, cardInfo cardr
 		// カードの挿入
 		card, err := cardRepo.InsertCard(ctx, cardInfo.ToInsertCardParamsExceptMonster())
 		if err != nil {
-			return fmt.Errorf("error create card %w", err)
+			return 0, fmt.Errorf("error create card %w", err)
 		}
 
 		// トラップ種別の取得
 		trapType, err := trapTypeRepo.GetTrapTypeByNameEn(ctx, cardInfo.Race)
 		if err != nil {
-			return fmt.Errorf("error get trap type %w", err)
+			return 0, fmt.Errorf("error get trap type %w", err)
 		}
 
 		// Trapテーブルへの挿入
 		_, err = trapRepo.InsertTrap(ctx, card.ID, trapType.ID)
 
 		if err != nil {
-			return fmt.Errorf("error create card %w", err)
+			return 0, fmt.Errorf("error create card %w", err)
 		}
 
-		result = card.ID
-		return nil
+		return card.ID, nil
 	})
-
-	return result, err
 }
 
 func (n *neonUseCaseImpl) GetTrapCardByID(ctx context.Context, cardID int64) (cardrecord.TrapCardSelectResult, error) {

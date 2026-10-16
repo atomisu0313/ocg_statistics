@@ -16,10 +16,8 @@ import (
 func (n *neonUseCaseImpl) InsertMonsterCardInfo(ctx context.Context, cardInfo cardrecord.StandardCard) (int64, error) {
 	tr := transaction.NewTx(n.ProduceConnDB())
 
-	result := int64(0)
-
 	// 以下の一連の流れをトランザクション境界内で実行
-	err := tr.ExecTx(ctx, func(q *sqlc_gen.Queries) error {
+	return transaction.ExecTx(ctx, tr, func(q *sqlc_gen.Queries) (int64, error) {
 
 		// リポジトリの準備
 		cardRepo := repository.NewCardRepository(q)
@@ -37,20 +35,20 @@ func (n *neonUseCaseImpl) InsertMonsterCardInfo(ctx context.Context, cardInfo ca
 		// カードの挿入
 		card, err := cardRepo.InsertCard(ctx, cardInfo.ToInsertCardParamsExceptMonster())
 		if err != nil {
-			return fmt.Errorf("error create card %w", err)
+			return 0, fmt.Errorf("error create card %w", err)
 		}
 
 		// 種族をIDに変換
 		raceEntity, err := raceRepo.GetRaceByNameEn(ctx, cardInfo.Race)
 		if err != nil {
-			return fmt.Errorf("error get race %w", err)
+			return 0, fmt.Errorf("error get race %w", err)
 		}
 		raceID := raceEntity.ID
 
 		// 属性をIDに変換
 		attributeEntity, err := attributeRepo.GetAttributeByNameEn(ctx, cardInfo.Attribute)
 		if err != nil {
-			return fmt.Errorf("error get attribute %w", err)
+			return 0, fmt.Errorf("error get attribute %w", err)
 		}
 		attributeID := attributeEntity.ID
 
@@ -75,14 +73,14 @@ func (n *neonUseCaseImpl) InsertMonsterCardInfo(ctx context.Context, cardInfo ca
 		)
 
 		if err != nil {
-			return fmt.Errorf("error create monster %w", err)
+			return 0, fmt.Errorf("error create monster %w", err)
 		}
 
 		// モンスターの種類がFusionの場合は、Fusionテーブルへの挿入
 		if slices.Contains(cardInfo.TypeLines, "Fusion") {
 			_, err = fusionMonsterRepo.InsertFusionMonster(ctx, card.ID)
 			if err != nil {
-				return fmt.Errorf("error create fusion monster %w", err)
+				return 0, fmt.Errorf("error create fusion monster %w", err)
 			}
 		}
 
@@ -90,7 +88,7 @@ func (n *neonUseCaseImpl) InsertMonsterCardInfo(ctx context.Context, cardInfo ca
 		if slices.Contains(cardInfo.TypeLines, "Synchro") {
 			_, err = synchroMonsterRepo.InsertSynchroMonster(ctx, card.ID)
 			if err != nil {
-				return fmt.Errorf("error create synchro monster %w", err)
+				return 0, fmt.Errorf("error create synchro monster %w", err)
 			}
 		}
 
@@ -98,7 +96,7 @@ func (n *neonUseCaseImpl) InsertMonsterCardInfo(ctx context.Context, cardInfo ca
 		if slices.Contains(cardInfo.TypeLines, "Xyz") {
 			_, err = xyzMonsterRepo.InsertXyzMonster(ctx, card.ID)
 			if err != nil {
-				return fmt.Errorf("error create xyz monster %w", err)
+				return 0, fmt.Errorf("error create xyz monster %w", err)
 			}
 		}
 
@@ -106,7 +104,7 @@ func (n *neonUseCaseImpl) InsertMonsterCardInfo(ctx context.Context, cardInfo ca
 		if slices.Contains(cardInfo.TypeLines, "Ritual") {
 			_, err = ritualMonsterRepo.InsertRitualMonster(ctx, card.ID)
 			if err != nil {
-				return fmt.Errorf("error create ritual monster %w", err)
+				return 0, fmt.Errorf("error create ritual monster %w", err)
 			}
 		}
 
@@ -114,7 +112,7 @@ func (n *neonUseCaseImpl) InsertMonsterCardInfo(ctx context.Context, cardInfo ca
 		if slices.Contains(cardInfo.TypeLines, "Pendulum") {
 			_, err = pendulumMonsterRepo.InsertPendulumMonster(ctx, card.ID, cardInfo.PendulumScale, cardInfo.PendulumTextJa, cardInfo.PendulumTextEn)
 			if err != nil {
-				return fmt.Errorf("error create pendulum monster %w", err)
+				return 0, fmt.Errorf("error create pendulum monster %w", err)
 			}
 		}
 
@@ -123,15 +121,12 @@ func (n *neonUseCaseImpl) InsertMonsterCardInfo(ctx context.Context, cardInfo ca
 			// Linkマーカーに変換する処理が必要な気がする
 			_, err = linkMonsterRepo.InsertLinkMonster(ctx, card.ID, kind.ConvertLinkMarkerStringToLinkMarkerValInt(cardInfo.LinkMarkers))
 			if err != nil {
-				return fmt.Errorf("error create link monster %w", err)
+				return 0, fmt.Errorf("error create link monster %w", err)
 			}
 		}
 
-		result = card.ID
-		return nil
+		return card.ID, nil
 	})
-
-	return result, err
 }
 
 // GetMonsterCardByID は、モンスターのカードを取得。

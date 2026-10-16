@@ -33,20 +33,14 @@ func TestPendulumMonsterInsert(t *testing.T) {
 		testPendulumTextEn := "Dragon"
 
 		tr := transaction.NewTx(dbConn.DB)
-		var insertedMonster sqlc_gen.PendulumMonster
-		err := tr.ExecTx(ctx, func(q *sqlc_gen.Queries) error {
+		insertedMonster, err := transaction.ExecTx(ctx, tr, func(q *sqlc_gen.Queries) (sqlc_gen.PendulumMonster, error) {
 			repoMonster := repository.NewMonsterRepository(q)
 			repoPendulum := repository.NewPendulumMonsterRepository(q)
 			monster, err := repoMonster.InsertMonster(ctx, testCardID, testRaceID, testAttributeID, testAttack, testDefense, testLevel, testTypeIDs)
 			if err != nil {
-				return fmt.Errorf("error inserting monster: %w", err)
+				return sqlc_gen.PendulumMonster{}, fmt.Errorf("error inserting monster: %w", err)
 			}
-			target, err := repoPendulum.InsertPendulumMonster(ctx, monster.CardID, testScale, testPendulumTextJa, testPendulumTextEn)
-			if err != nil {
-				return fmt.Errorf("error inserting pendulum monster: %w", err)
-			}
-			insertedMonster = target
-			return nil
+			return repoPendulum.InsertPendulumMonster(ctx, monster.CardID, testScale, testPendulumTextJa, testPendulumTextEn)
 		})
 
 		assert.NoError(t, err)
@@ -74,18 +68,15 @@ func TestGetPendulumMonsterByCardID(t *testing.T) {
 		testPendulumTextEn := "Dragon"
 
 		tr := transaction.NewTx(dbConn.DB)
-		err := tr.ExecTx(ctx, func(q *sqlc_gen.Queries) error {
+		_, err := transaction.ExecTx(ctx, tr, func(q *sqlc_gen.Queries) (struct{}, error) {
 			repoMonster := repository.NewMonsterRepository(q)
 			repoPendulum := repository.NewPendulumMonsterRepository(q)
 			monster, err := repoMonster.InsertMonster(ctx, testCardID, testRaceID, testAttributeID, testAttack, testDefense, testLevel, testTypeIDs)
 			if err != nil {
-				return fmt.Errorf("error inserting monster: %w", err)
+				return struct{}{}, fmt.Errorf("error inserting monster: %w", err)
 			}
 			_, err = repoPendulum.InsertPendulumMonster(ctx, monster.CardID, testScale, testPendulumTextJa, testPendulumTextEn)
-			if err != nil {
-				return fmt.Errorf("error inserting pendulum monster: %w", err)
-			}
-			return nil
+			return struct{}{}, err
 		})
 
 		q := sqlc_gen.New(dbConn)

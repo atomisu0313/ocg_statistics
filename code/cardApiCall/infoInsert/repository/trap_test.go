@@ -2,7 +2,6 @@ package repository_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"atomisu.com/ocg-statics/infoInsert/dto/cardrecord"
@@ -30,16 +29,9 @@ func TestForTrap(t *testing.T) {
 		tr := transaction.NewTx(dbConn.DB)
 
 		// トランザクション境界の中で実行(useCaseではこの中にbaseCard挿入処理を入れる)
-		var insertedTrap sqlc_gen.Trap
-		err := tr.ExecTx(ctx, func(q *sqlc_gen.Queries) error {
+		insertedTrap, err := transaction.ExecTx(ctx, tr, func(q *sqlc_gen.Queries) (sqlc_gen.Trap, error) {
 			trapRepo := repository.NewTrapRepository(q)
-
-			trap, err := trapRepo.InsertTrap(ctx, card.ID, trapTypeID)
-			if err != nil {
-				return fmt.Errorf("error inserting trap: %w", err)
-			}
-			insertedTrap = trap
-			return nil
+			return trapRepo.InsertTrap(ctx, card.ID, trapTypeID)
 		})
 		require.NoError(t, err, "Transaction should execute without error")
 
@@ -49,17 +41,9 @@ func TestForTrap(t *testing.T) {
 
 		// データの取得
 		ctx2 := context.Background()
-		var fetchedTrap cardrecord.TrapCardSelectResult
-
-		err = tr.ExecTx(ctx2, func(q *sqlc_gen.Queries) error {
+		fetchedTrap, err := transaction.ExecTx(ctx2, tr, func(q *sqlc_gen.Queries) (cardrecord.TrapCardSelectResult, error) {
 			trapRepo := repository.NewTrapRepository(q)
-
-			trap, err := trapRepo.GetTrapByCardID(ctx2, insertedTrap.CardID)
-			if err != nil {
-				return fmt.Errorf("error inserting trap: %w", err)
-			}
-			fetchedTrap = trap
-			return nil
+			return trapRepo.GetTrapByCardID(ctx2, insertedTrap.CardID)
 		})
 
 		assert.Equal(t, insertedTrap.CardID, fetchedTrap.ID, "Fetched trap card ID should match the inserted one")

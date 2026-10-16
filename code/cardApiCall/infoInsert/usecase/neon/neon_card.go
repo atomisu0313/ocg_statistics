@@ -40,16 +40,13 @@ func (n *neonUseCaseImpl) InsertCardInfo(ctx context.Context, cardInfo cardrecor
 func (n *neonUseCaseImpl) GetCardPatternByCardID(ctx context.Context, cardID int64) (cardrecord.CardPatternSelectResult, error) {
 	tr := transaction.NewTx(n.ProduceConnDB())
 
-	result := cardrecord.CardPatternSelectResult{}
-
-	err := tr.ExecTx(ctx, func(q *sqlc_gen.Queries) error {
+	return transaction.ExecTx(ctx, tr, func(q *sqlc_gen.Queries) (cardrecord.CardPatternSelectResult, error) {
 		cardRepo := repository.NewCardRepository(q)
 		cardPattern, err := cardRepo.GetCardPatternByCardID(ctx, cardID)
 		if err != nil {
-			return fmt.Errorf("error get card pattern: %w", err)
+			return cardrecord.CardPatternSelectResult{}, fmt.Errorf("error get card pattern: %w", err)
 		}
-		result = *result.FromSelectCardPatternByCardIDRow(cardPattern)
-		return nil
+		result := cardrecord.CardPatternSelectResult{}
+		return *result.FromSelectCardPatternByCardIDRow(cardPattern), nil
 	})
-	return result, err
 }

@@ -31,20 +31,14 @@ func TestLinkMonsterInsert(t *testing.T) {
 		testLinkMarker := int32(4)
 
 		tr := transaction.NewTx(dbConn.DB)
-		var insertedMonster sqlc_gen.LinkMonster
-		err := tr.ExecTx(ctx, func(q *sqlc_gen.Queries) error {
+		insertedMonster, err := transaction.ExecTx(ctx, tr, func(q *sqlc_gen.Queries) (sqlc_gen.LinkMonster, error) {
 			repoMonster := repository.NewMonsterRepository(q)
 			repoLink := repository.NewLinkMonsterRepository(q)
 			monster, err := repoMonster.InsertMonster(ctx, testCardID, testRaceID, testAttributeID, testAttack, testDefense, testLevel, testTypeIDs)
 			if err != nil {
-				return fmt.Errorf("error inserting monster: %w", err)
+				return sqlc_gen.LinkMonster{}, fmt.Errorf("error inserting monster: %w", err)
 			}
-			target, err := repoLink.InsertLinkMonster(ctx, monster.CardID, testLinkMarker)
-			if err != nil {
-				return fmt.Errorf("error inserting link monster: %w", err)
-			}
-			insertedMonster = target
-			return nil
+			return repoLink.InsertLinkMonster(ctx, monster.CardID, testLinkMarker)
 		})
 
 		assert.NoError(t, err)
@@ -71,18 +65,15 @@ func TestGetLinkMonsterByCardID(t *testing.T) {
 		testLinkMarker := int32(4)
 
 		tr := transaction.NewTx(dbConn.DB)
-		err := tr.ExecTx(ctx, func(q *sqlc_gen.Queries) error {
+		_, err := transaction.ExecTx(ctx, tr, func(q *sqlc_gen.Queries) (struct{}, error) {
 			repoMonster := repository.NewMonsterRepository(q)
 			repoLink := repository.NewLinkMonsterRepository(q)
 			monster, err := repoMonster.InsertMonster(ctx, testCardID, testRaceID, testAttributeID, testAttack, testDefense, testLevel, testTypeIDs)
 			if err != nil {
-				return fmt.Errorf("error inserting monster: %w", err)
+				return struct{}{}, fmt.Errorf("error inserting monster: %w", err)
 			}
 			_, err = repoLink.InsertLinkMonster(ctx, monster.CardID, testLinkMarker)
-			if err != nil {
-				return fmt.Errorf("error inserting link monster: %w", err)
-			}
-			return nil
+			return struct{}{}, err
 		})
 
 		q := sqlc_gen.New(dbConn)

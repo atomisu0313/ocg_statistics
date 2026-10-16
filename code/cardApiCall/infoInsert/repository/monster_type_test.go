@@ -2,7 +2,6 @@ package repository_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"atomisu.com/ocg-statics/infoInsert/config"
@@ -18,15 +17,9 @@ func testMonsterTypeRetrieval(t *testing.T, dbConn *config.DbConn, target kind.M
 	ctx := context.Background()
 	tr := transaction.NewTx(dbConn.DB)
 
-	var result kind.MonsterKind
-	err := tr.ExecTx(ctx, func(q *sqlc_gen.Queries) error {
+	result, err := transaction.ExecTx(ctx, tr, func(q *sqlc_gen.Queries) (kind.MonsterKind, error) {
 		monsterTypeRepo := repository.NewMonsterTypeRepository(q)
-		monsterType, err := getFunc(ctx, monsterTypeRepo)
-		if err != nil {
-			return fmt.Errorf("error getting monster type: %w", err)
-		}
-		result = monsterType
-		return nil
+		return getFunc(ctx, monsterTypeRepo)
 	})
 
 	assert.NoError(t, err)

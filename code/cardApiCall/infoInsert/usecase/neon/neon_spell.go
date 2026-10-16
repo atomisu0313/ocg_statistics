@@ -14,9 +14,7 @@ func (n *neonUseCaseImpl) InsertSpellCardInfo(ctx context.Context, cardInfo card
 
 	tr := transaction.NewTx(n.ProduceConnDB())
 
-	result := int64(0)
-
-	err := tr.ExecTx(ctx, func(q *sqlc_gen.Queries) error {
+	return transaction.ExecTx(ctx, tr, func(q *sqlc_gen.Queries) (int64, error) {
 		// リポジトリの準備
 		cardRepo := repository.NewCardRepository(q)
 		spellRepo := repository.NewSpellRepository(q)
@@ -25,27 +23,24 @@ func (n *neonUseCaseImpl) InsertSpellCardInfo(ctx context.Context, cardInfo card
 		// カードの挿入
 		card, err := cardRepo.InsertCard(ctx, cardInfo.ToInsertCardParamsExceptMonster())
 		if err != nil {
-			return fmt.Errorf("error create card %w", err)
+			return 0, fmt.Errorf("error create card %w", err)
 		}
 
 		// 魔法種別の取得
 		spellType, err := spellTypeRepo.GetSpellTypeByNameEn(ctx, cardInfo.Race)
 		if err != nil {
-			return fmt.Errorf("error get spell type %w", err)
+			return 0, fmt.Errorf("error get spell type %w", err)
 		}
 
 		// Spellテーブルへの挿入
 		_, err = spellRepo.InsertSpell(ctx, card.ID, spellType.ID)
 
 		if err != nil {
-			return fmt.Errorf("error create card %w", err)
+			return 0, fmt.Errorf("error create card %w", err)
 		}
 
-		result = card.ID
-		return nil
+		return card.ID, nil
 	})
-
-	return result, err
 }
 
 func (n *neonUseCaseImpl) GetSpellCardByID(ctx context.Context, cardID int64) (cardrecord.SpellCardSelectResult, error) {

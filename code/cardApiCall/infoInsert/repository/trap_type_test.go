@@ -2,7 +2,6 @@ package repository_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"atomisu.com/ocg-statics/infoInsert/config"
@@ -19,15 +18,9 @@ func testTrapTypeRetrieval(t *testing.T, dbConn *config.DbConn, target kind.Trap
 	ctx := context.Background()
 	tr := transaction.NewTx(dbConn.DB)
 
-	var result kind.TrapKind
-	err := tr.ExecTx(ctx, func(q *sqlc_gen.Queries) error {
+	result, err := transaction.ExecTx(ctx, tr, func(q *sqlc_gen.Queries) (kind.TrapKind, error) {
 		trapTypeRepo := repository.NewTrapTypeRepository(q)
-		trapType, err := getFunc(ctx, trapTypeRepo)
-		if err != nil {
-			return fmt.Errorf("error getting trap type: %w", err)
-		}
-		result = trapType
-		return nil
+		return getFunc(ctx, trapTypeRepo)
 	})
 
 	assert.NoError(t, err)

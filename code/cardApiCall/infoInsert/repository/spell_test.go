@@ -2,7 +2,6 @@ package repository_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"atomisu.com/ocg-statics/infoInsert/dto/cardrecord"
@@ -30,16 +29,9 @@ func TestForSpell(t *testing.T) {
 		tr := transaction.NewTx(dbConn.DB)
 
 		// トランザクション境界の中で実行(useCaseではこの中にbaseCard挿入処理を入れる)
-		var insertedSpell sqlc_gen.Spell
-		err := tr.ExecTx(ctx, func(q *sqlc_gen.Queries) error {
+		insertedSpell, err := transaction.ExecTx(ctx, tr, func(q *sqlc_gen.Queries) (sqlc_gen.Spell, error) {
 			spellRepo := repository.NewSpellRepository(q)
-
-			spell, err := spellRepo.InsertSpell(ctx, card.ID, spellTypeID)
-			if err != nil {
-				return fmt.Errorf("error inserting spell: %w", err)
-			}
-			insertedSpell = spell
-			return nil
+			return spellRepo.InsertSpell(ctx, card.ID, spellTypeID)
 		})
 		require.NoError(t, err, "Transaction should execute without error")
 
@@ -49,17 +41,9 @@ func TestForSpell(t *testing.T) {
 
 		// データの取得
 		ctx2 := context.Background()
-		var fetchedSpell cardrecord.SpellCardSelectResult
-
-		err = tr.ExecTx(ctx2, func(q *sqlc_gen.Queries) error {
+		fetchedSpell, err := transaction.ExecTx(ctx2, tr, func(q *sqlc_gen.Queries) (cardrecord.SpellCardSelectResult, error) {
 			spellRepo := repository.NewSpellRepository(q)
-
-			spell, err := spellRepo.GetSpellByCardID(ctx2, insertedSpell.CardID)
-			if err != nil {
-				return fmt.Errorf("error inserting spell: %w", err)
-			}
-			fetchedSpell = spell
-			return nil
+			return spellRepo.GetSpellByCardID(ctx2, insertedSpell.CardID)
 		})
 
 		assert.Equal(t, insertedSpell.CardID, fetchedSpell.ID, "Fetched spell card ID should match the inserted one")

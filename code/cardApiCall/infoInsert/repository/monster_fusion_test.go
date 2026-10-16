@@ -30,20 +30,14 @@ func TestFusionMonsterInsert(t *testing.T) {
 		testTypeIDs := []int32{1, 2} // Example type IDs
 
 		tr := transaction.NewTx(dbConn.DB)
-		var insertedMonster sqlc_gen.FusionMonster
-		err := tr.ExecTx(ctx, func(q *sqlc_gen.Queries) error {
+		insertedMonster, err := transaction.ExecTx(ctx, tr, func(q *sqlc_gen.Queries) (sqlc_gen.FusionMonster, error) {
 			repoMonster := repository.NewMonsterRepository(q)
 			repoFusion := repository.NewFusionMonsterRepository(q)
 			monster, err := repoMonster.InsertMonster(ctx, testCardID, testRaceID, testAttributeID, testAttack, testDefense, testLevel, testTypeIDs)
 			if err != nil {
-				return fmt.Errorf("error inserting monster: %w", err)
+				return sqlc_gen.FusionMonster{}, fmt.Errorf("error inserting monster: %w", err)
 			}
-			target, err := repoFusion.InsertFusionMonster(ctx, monster.CardID)
-			if err != nil {
-				return fmt.Errorf("error inserting fusion monster: %w", err)
-			}
-			insertedMonster = target
-			return nil
+			return repoFusion.InsertFusionMonster(ctx, monster.CardID)
 		})
 
 		assert.NoError(t, err)
@@ -68,18 +62,15 @@ func TestGetFusionMonsterByCardID(t *testing.T) {
 		testTypeIDs := []int32{2, 4}
 
 		tr := transaction.NewTx(dbConn.DB)
-		err := tr.ExecTx(ctx, func(q *sqlc_gen.Queries) error {
+		_, err := transaction.ExecTx(ctx, tr, func(q *sqlc_gen.Queries) (struct{}, error) {
 			repoMonster := repository.NewMonsterRepository(q)
 			repoFusion := repository.NewFusionMonsterRepository(q)
 			monster, err := repoMonster.InsertMonster(ctx, testCardID, testRaceID, testAttributeID, testAttack, testDefense, testLevel, testTypeIDs)
 			if err != nil {
-				return fmt.Errorf("error inserting monster: %w", err)
+				return struct{}{}, fmt.Errorf("error inserting monster: %w", err)
 			}
 			_, err = repoFusion.InsertFusionMonster(ctx, monster.CardID)
-			if err != nil {
-				return fmt.Errorf("error inserting fusion monster: %w", err)
-			}
-			return nil
+			return struct{}{}, err
 		})
 
 		q := sqlc_gen.New(dbConn)

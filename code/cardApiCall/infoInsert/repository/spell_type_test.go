@@ -2,7 +2,6 @@ package repository_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"atomisu.com/ocg-statics/infoInsert/config"
@@ -19,15 +18,9 @@ func testSpellTypeRetrieval(t *testing.T, dbConn *config.DbConn, target kind.Spe
 	ctx := context.Background()
 	tr := transaction.NewTx(dbConn.DB)
 
-	var result kind.SpellKind
-	err := tr.ExecTx(ctx, func(q *sqlc_gen.Queries) error {
+	result, err := transaction.ExecTx(ctx, tr, func(q *sqlc_gen.Queries) (kind.SpellKind, error) {
 		spellTypeRepo := repository.NewSpellTypeRepository(q)
-		spellType, err := getFunc(ctx, spellTypeRepo)
-		if err != nil {
-			return fmt.Errorf("error getting spell type: %w", err)
-		}
-		result = spellType
-		return nil
+		return getFunc(ctx, spellTypeRepo)
 	})
 
 	assert.NoError(t, err)

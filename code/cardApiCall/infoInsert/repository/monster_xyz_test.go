@@ -30,20 +30,14 @@ func TestXyzMonsterInsert(t *testing.T) {
 		testTypeIDs := []int32{1, 2} // Example type IDs
 
 		tr := transaction.NewTx(dbConn.DB)
-		var insertedMonster sqlc_gen.XyzMonster
-		err := tr.ExecTx(ctx, func(q *sqlc_gen.Queries) error {
+		insertedMonster, err := transaction.ExecTx(ctx, tr, func(q *sqlc_gen.Queries) (sqlc_gen.XyzMonster, error) {
 			repoMonster := repository.NewMonsterRepository(q)
 			repoXyz := repository.NewXyzMonsterRepository(q)
 			monster, err := repoMonster.InsertMonster(ctx, testCardID, testRaceID, testAttributeID, testAttack, testDefense, testLevel, testTypeIDs)
 			if err != nil {
-				return fmt.Errorf("error inserting monster: %w", err)
+				return sqlc_gen.XyzMonster{}, fmt.Errorf("error inserting monster: %w", err)
 			}
-			target, err := repoXyz.InsertXyzMonster(ctx, monster.CardID)
-			if err != nil {
-				return fmt.Errorf("error inserting xyz monster: %w", err)
-			}
-			insertedMonster = target
-			return nil
+			return repoXyz.InsertXyzMonster(ctx, monster.CardID)
 		})
 
 		assert.NoError(t, err)
@@ -68,18 +62,15 @@ func TestGetXyzMonsterByCardID(t *testing.T) {
 		testTypeIDs := []int32{2, 4}
 
 		tr := transaction.NewTx(dbConn.DB)
-		err := tr.ExecTx(ctx, func(q *sqlc_gen.Queries) error {
+		_, err := transaction.ExecTx(ctx, tr, func(q *sqlc_gen.Queries) (struct{}, error) {
 			repoMonster := repository.NewMonsterRepository(q)
 			repoXyz := repository.NewXyzMonsterRepository(q)
 			monster, err := repoMonster.InsertMonster(ctx, testCardID, testRaceID, testAttributeID, testAttack, testDefense, testLevel, testTypeIDs)
 			if err != nil {
-				return fmt.Errorf("error inserting monster: %w", err)
+				return struct{}{}, fmt.Errorf("error inserting monster: %w", err)
 			}
 			_, err = repoXyz.InsertXyzMonster(ctx, monster.CardID)
-			if err != nil {
-				return fmt.Errorf("error inserting xyz monster: %w", err)
-			}
-			return nil
+			return struct{}{}, err
 		})
 
 		q := sqlc_gen.New(dbConn)

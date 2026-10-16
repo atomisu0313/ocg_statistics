@@ -2,7 +2,6 @@ package repository_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"atomisu.com/ocg-statics/infoInsert/config"
@@ -18,15 +17,9 @@ func testRaceRetrieval(t *testing.T, dbConn *config.DbConn, target kind.RaceKind
 	ctx := context.Background()
 	tr := transaction.NewTx(dbConn.DB)
 
-	var result kind.RaceKind
-	err := tr.ExecTx(ctx, func(q *sqlc_gen.Queries) error {
+	result, err := transaction.ExecTx(ctx, tr, func(q *sqlc_gen.Queries) (kind.RaceKind, error) {
 		raceRepo := repository.NewRaceRepository(q)
-		race, err := getFunc(ctx, raceRepo)
-		if err != nil {
-			return fmt.Errorf("error getting race: %w", err)
-		}
-		result = race
-		return nil
+		return getFunc(ctx, raceRepo)
 	})
 
 	assert.NoError(t, err)

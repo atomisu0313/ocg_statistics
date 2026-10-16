@@ -2,7 +2,6 @@ package repository_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"atomisu.com/ocg-statics/infoInsert/config"
@@ -18,15 +17,9 @@ func testAttributeRetrieval(t *testing.T, dbConn *config.DbConn, target kind.Att
 	ctx := context.Background()
 	tr := transaction.NewTx(dbConn.DB)
 
-	var result kind.AttributeKind
-	err := tr.ExecTx(ctx, func(q *sqlc_gen.Queries) error {
+	result, err := transaction.ExecTx(ctx, tr, func(q *sqlc_gen.Queries) (kind.AttributeKind, error) {
 		attributeRepo := repository.NewAttributeRepository(q)
-		attribute, err := getFunc(ctx, attributeRepo)
-		if err != nil {
-			return fmt.Errorf("error getting attribute: %w", err)
-		}
-		result = attribute
-		return nil
+		return getFunc(ctx, attributeRepo)
 	})
 
 	assert.NoError(t, err)
