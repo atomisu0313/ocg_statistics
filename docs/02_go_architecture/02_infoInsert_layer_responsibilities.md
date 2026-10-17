@@ -166,8 +166,8 @@ flowchart LR
 | `dto` が `sqlc_gen` に依存 | `StandardCard.ToInsertCardParamsExceptMonster()` が sqlc の型を返すため、共有モデルがインフラの型を知っている | DB 型への変換は `repository` に移す |
 | UseCase がインフラを直接生成 | `neuron` / `tcgapi` が `htmlget.NewNeuronHtmlGetter()` や `http.NewTCGRest()` を関数の中で `new` している | DI に登録して interface で受け取れば、モックでテストできる |
 | DB 不要な UseCase も DB 接続を持つ | `NewUseCase` が全 UseCase に `DbConn` を入れるため、`neuron` / `tcgapi` も DB に依存する | 基底を「DB あり / なし」に分ける |
-| `neon` に一部 `sqlc_gen` 直接利用 | 参照系（`GetMonsterCardByID` など）は `transaction` を通さず `sqlc_gen.New(...)` を直接呼ぶ | `tr.ExecNonTx` にそろえる |
-| ドメイン層が空 | 種別判定などのルールが `usecase/neon` と `dto/kind` に分かれている | ルールが増えたら `domain/` に集める |
+| `neon` に一部 `sqlc_gen` 直接利用 | 参照系（`GetMonsterCardByID` など）は `transaction` を通さず `sqlc_gen.New(...)` を直接呼ぶ | `tr.ExecNonTx` にそろえる（テンプレートおよび手順書で統一済み） |
+| ドメイン層が空 | 種別判定などのルールが `usecase/neon` と `dto/kind` に分かれている | 本アプリは ETL/データ連携のため Entity は新設せず、DTO 中心設計（[05_dto_design_policy.md](./05_dto_design_policy.md)）を維持・整理する |
 | パッケージ名 `http` | 標準ライブラリの `net/http` と名前が同じ | `tcgclient` などに改名 |
 
 ---

@@ -1,7 +1,7 @@
 # ルール: DB変更操作におけるトランザクション境界の配置原則
 
 DB変更操作（INSERT / UPDATE / DELETE）を実装・改修する際は、以下のルールを厳格に遵守すること。
-詳細な技術メカニズムや背景は [docs/2_go_architecture/03_generic_transaction_pattern.md](../../../2_go_architecture/03_generic_transaction_pattern.md) を参照。
+詳細な技術メカニズムや背景は [docs/02_go_architecture/03_generic_transaction_pattern.md](../../../02_go_architecture/03_generic_transaction_pattern.md) を参照。
 
 ---
 

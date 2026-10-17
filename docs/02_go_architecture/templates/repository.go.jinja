@@ -1,0 +1,74 @@
+{#
+  Repository Template (Jinja2)
+  
+  Variables:
+  - entity_name: e.g. "Spell", "Card", "Race"
+  - entity_var: e.g. "spell", "card", "race"
+  - return_type: e.g. "cardrecord.SpellCardSelectResult" or "sqlc_gen.Spell" or "kind.RaceKind"
+  - methods: list of {
+      "name": "GetSpellByID",
+      "args": [{"name": "cardID", "type": "int64"}],
+      "return_type": "cardrecord.SpellCardSelectResult",
+      "sqlc_call": "r.queries.SelectFullSpellCardInfoByCardID(ctx, cardID)",
+      "zap_field": "zap.Int64(\"card_id\", cardID)",
+      "converts_to_dto": true
+    }
+#}
+package repository
+
+import (
+	"context"
+	"time"
+
+	"atomisu.com/ocg-statics/infoInsert/dto/cardrecord"
+	"atomisu.com/ocg-statics/infoInsert/sqlc_gen"
+	"go.uber.org/zap"
+)
+
+// {{ entity_name }}Repository defines the interface for {{ entity_name | lower }} database operations.
+type {{ entity_name }}Repository interface {
+	Repository
+	{% for method in methods %}
+	{{ method.name }}(ctx context.Context{% for arg in method.args %}, {{ arg.name }} {{ arg.type }}{% endfor %}) ({{ method.return_type }}, error)
+	{% endfor %}
+}
+
+type {{ entity_name | lower }}RepositoryImpl struct {
+	*repository
+	queries *sqlc_gen.Queries
+}
+
+// New{{ entity_name }}Repository creates a new instance of {{ entity_name }}Repository.
+func New{{ entity_name }}Repository(q *sqlc_gen.Queries) {{ entity_name }}Repository {
+	return NewRepository(func(r *repository) {{ entity_name }}Repository {
+		return &{{ entity_name | lower }}RepositoryImpl{
+			repository: r,
+			queries:    q,
+		}
+	})
+}
+
+{% for method in methods %}
+// {{ method.name }} executes the database query with structured logging.
+func (r *{{ entity_name | lower }}RepositoryImpl) {{ method.name }}(ctx context.Context{% for arg in method.args %}, {{ arg.name }} {{ arg.type }}{% endfor %}) ({{ method.return_type }}, error) {
+	start := time.Now()
+	defer r.logDBOperation("{{ method.name }}", start, {{ method.zap_field }})
+
+	res, err := {{ method.sqlc_call }}
+	if err != nil {
+		r.logDBError("{{ method.name }}", err, {{ method.zap_field }})
+		var zero {{ method.return_type }}
+		return zero, err
+	}
+
+	{% if method.converts_to_dto %}
+	dtoResult := &{{ method.return_type }}{}
+	result := dtoResult.FromSelectFull{{ entity_name }}InfoRow(res)
+	r.logDBResult("{{ method.name }}", result, {{ method.zap_field }})
+	return *result, nil
+	{% else %}
+	r.logDBResult("{{ method.name }}", res, {{ method.zap_field }})
+	return res, nil
+	{% endif %}
+}
+{% endfor %}

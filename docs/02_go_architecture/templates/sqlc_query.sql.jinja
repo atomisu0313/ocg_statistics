@@ -1,0 +1,76 @@
+{#
+  sqlc Query Template (Jinja2)
+  
+  Variables:
+  - table_name: e.g. "spells", "cards", "attributes"
+  - entity_name: e.g. "Spell", "Card", "Attribute"
+  - primary_key: e.g. {"name": "id", "type": "bigint"} or {"name": "card_id", "type": "bigint"}
+  - fields: list of {"name": "column_name", "type": "text/int/etc", "nullable": true/false}
+  - search_fields: list of {"name": "name_ja", "pascal_name": "NameJa"}
+  - join_info: optional dict with parent_table, master_tables, etc.
+#}
+-- name: Get{{ entity_name }}ByID :one
+-- Get{{ entity_name }}ByID returns a single {{ entity_name }} record by primary key.
+SELECT
+  {% for field in fields -%}
+  {{ field.name }}{{ ", " if not loop.last else "" }}
+  {%- endfor %}
+FROM {{ table_name }}
+WHERE {{ primary_key.name }} = $1;
+
+{% if search_fields %}
+{% for sf in search_fields %}
+-- name: Select{{ entity_name }}By{{ sf.pascal_name }} :one
+-- Select{{ entity_name }}By{{ sf.pascal_name }} returns a single record by {{ sf.name }}.
+SELECT
+  {% for field in fields -%}
+  {{ field.name }}{{ ", " if not loop.last else "" }}
+  {%- endfor %}
+FROM {{ table_name }}
+WHERE {{ sf.name }} = $1;
+
+{% endfor %}
+{% endif %}
+-- name: Insert{{ entity_name }} :one
+-- Insert{{ entity_name }} inserts a new {{ entity_name }} record.
+INSERT INTO {{ table_name }} (
+  {% for field in fields if field.name != primary_key.name or not primary_key.auto_increment -%}
+  {{ field.name }}{{ ", " if not loop.last else "" }}
+  {%- endfor %}
+) VALUES (
+  {% for field in fields if field.name != primary_key.name or not primary_key.auto_increment -%}
+  ${{ loop.index }}{{ ", " if not loop.last else "" }}
+  {%- endfor %}
+)
+RETURNING *;
+
+-- name: Update{{ entity_name }} :one
+-- Update{{ entity_name }} updates an existing {{ entity_name }} record.
+UPDATE {{ table_name }}
+SET
+  {% set non_pk_fields = fields | rejectattr("name", "equalto", primary_key.name) | list %}
+  {% for field in non_pk_fields -%}
+  {{ field.name }} = ${{ loop.index + 1 }}{{ ", " if not loop.last else "" }}
+  {%- endfor %}
+WHERE {{ primary_key.name }} = $1
+RETURNING *;
+
+-- name: Delete{{ entity_name }} :exec
+-- Delete{{ entity_name }} deletes a record by primary key.
+DELETE FROM {{ table_name }}
+WHERE {{ primary_key.name }} = $1;
+
+{% if join_info %}
+-- name: SelectFull{{ entity_name }}InfoBy{{ primary_key.name | replace("_", " ") | title | replace(" ", "") }} :one
+-- SelectFull{{ entity_name }}Info returns joined details including parent and master tables.
+SELECT
+  {{ table_name }}.*
+  {% for j in join_info.joins -%}
+  , {{ j.table }}.{{ j.column }} AS {{ j.alias }}
+  {% endfor -%}
+FROM {{ table_name }}
+{% for j in join_info.joins %}
+JOIN {{ j.table }} ON {{ table_name }}.{{ j.fk }} = {{ j.table }}.{{ j.pk }}
+{% endfor %}
+WHERE {{ table_name }}.{{ primary_key.name }} = $1;
+{% endif %}

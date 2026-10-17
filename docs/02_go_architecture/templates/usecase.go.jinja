@@ -1,0 +1,77 @@
+{#
+  UseCase Template (Jinja2)
+  
+  Variables:
+  - package_name: e.g. "neon" or "master"
+  - usecase_name: e.g. "Neon", "Master", "Card"
+  - entity_name: e.g. "SpellCard", "MonsterCard"
+  - entity_dto: e.g. "cardrecord.StandardCard"
+  - result_dto: e.g. "cardrecord.SpellCardSelectResult"
+  - id_type: e.g. "int64"
+#}
+package {{ package_name }}
+
+import (
+	"context"
+	"fmt"
+
+	"atomisu.com/ocg-statics/infoInsert/dto/cardrecord"
+	"atomisu.com/ocg-statics/infoInsert/repository"
+	"atomisu.com/ocg-statics/infoInsert/sqlc_gen"
+	"atomisu.com/ocg-statics/infoInsert/transaction"
+	"atomisu.com/ocg-statics/infoInsert/usecase"
+	"github.com/samber/do"
+)
+
+// {{ usecase_name }}UseCase defines the use case interface for {{ entity_name }}.
+type {{ usecase_name }}UseCase interface {
+	usecase.UseCase
+	Insert{{ entity_name }}Info(ctx context.Context, cardInfo {{ entity_dto }}) ({{ id_type }}, error)
+	Get{{ entity_name }}ByID(ctx context.Context, id {{ id_type }}) ({{ result_dto }}, error)
+}
+
+type {{ usecase_name | lower }}UseCaseImpl struct {
+	*usecase.UseCaseImpl
+}
+
+// New{{ usecase_name }}UseCase registers and constructs a new {{ usecase_name }}UseCase with samber/do DI.
+func New{{ usecase_name }}UseCase(i *do.Injector) ({{ usecase_name }}UseCase, error) {
+	return usecase.NewUseCase(i, func(u *usecase.UseCaseImpl) {{ usecase_name }}UseCase {
+		return &{{ usecase_name | lower }}UseCaseImpl{u}
+	})
+}
+
+// Insert{{ entity_name }}Info manages the transaction boundary and orchestrates repository calls.
+func (u *{{ usecase_name | lower }}UseCaseImpl) Insert{{ entity_name }}Info(ctx context.Context, cardInfo {{ entity_dto }}) ({{ id_type }}, error) {
+	tr := transaction.NewTx(u.ProduceConnDB())
+
+	return transaction.ExecTx(ctx, tr, func(q *sqlc_gen.Queries) ({{ id_type }}, error) {
+		// 1. Initialize repositories bound to this transaction
+		cardRepo := repository.NewCardRepository(q)
+		entityRepo := repository.New{{ entity_name }}Repository(q)
+
+		// 2. Perform base insert
+		card, err := cardRepo.InsertCard(ctx, cardInfo.ToInsertCardParamsExceptMonster())
+		if err != nil {
+			return 0, fmt.Errorf("failed to insert base card: %w", err)
+		}
+
+		// 3. Perform entity-specific insert
+		// TODO: Add entity-specific logic, foreign key lookups, and child table inserts here
+		_, err = entityRepo.Insert{{ entity_name }}(ctx, card.ID /*, additional params */)
+		if err != nil {
+			return 0, fmt.Errorf("failed to insert {{ entity_name | lower }}: %w", err)
+		}
+
+		return card.ID, nil
+	})
+}
+
+// Get{{ entity_name }}ByID retrieves entity details without a transaction using ExecNonTx.
+func (u *{{ usecase_name | lower }}UseCaseImpl) Get{{ entity_name }}ByID(ctx context.Context, id {{ id_type }}) ({{ result_dto }}, error) {
+	tr := transaction.NewTx(u.ProduceConnDB())
+	return transaction.ExecNonTx(ctx, tr, func(q *sqlc_gen.Queries) ({{ result_dto }}, error) {
+		repo := repository.New{{ entity_name }}Repository(q)
+		return repo.Get{{ entity_name }}ByID(ctx, id)
+	})
+}

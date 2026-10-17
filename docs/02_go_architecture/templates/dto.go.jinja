@@ -1,0 +1,81 @@
+{#
+  DTO Template (Jinja2)
+  
+  Variables:
+  - package_name: e.g. "cardrecord" or "dto"
+  - entity_name: e.g. "SpellCard", "MonsterCard", "Item"
+  - entity_var: e.g. "s", "m"
+  - embed_base: true/false (embeds dto.AbstractSelectResult or AbstractCardSelectResult)
+  - fields: list of {
+      "name": "SpellTypeNameJa",
+      "go_type": "string",
+      "sql_null_type": "sql.NullString",
+      "db_tag": "spell_type_name_ja",
+      "json_tag": "spellTypeNameJa",
+      "is_null_type": true
+    }
+#}
+package {{ package_name }}
+
+import (
+	"database/sql"
+	{% if embed_base %}
+	"atomisu.com/ocg-statics/infoInsert/dto"
+	{% endif %}
+)
+
+// {{ entity_name }}SelectResult represents the application DTO for query results.
+type {{ entity_name }}SelectResult struct {
+	{% if embed_base %}
+	dto.AbstractSelectResult
+	{% endif %}
+	{% for field in fields %}
+	{{ field.name }} {{ field.go_type }} `db:"{{ field.db_tag }}" json:"{{ field.json_tag }}"`
+	{% endfor %}
+}
+
+// SelectFull{{ entity_name }}InfoRow represents the raw database row containing sql.Null* types.
+type SelectFull{{ entity_name }}InfoRow struct {
+	ID int64 `db:"id" json:"id"`
+	{% if embed_base %}
+	Dataowner       sql.NullString `db:"dataowner" json:"dataowner"`
+	RegistDate      sql.NullTime   `db:"regist_date" json:"registDate"`
+	EnableStartDate sql.NullTime   `db:"enable_start_date" json:"enableStartDate"`
+	EnableEndDate   sql.NullTime   `db:"enable_end_date" json:"enableEndDate"`
+	Version         sql.NullInt64  `db:"version" json:"version"`
+	{% endif %}
+	{% for field in fields %}
+	{{ field.name }} {{ field.sql_null_type }} `db:"{{ field.db_tag }}" json:"{{ field.json_tag }}"`
+	{% endfor %}
+}
+
+// FromSelectFull{{ entity_name }}InfoRow converts raw DB row with nullable fields into the domain DTO.
+func ({{ entity_var }} *{{ entity_name }}SelectResult) FromSelectFull{{ entity_name }}InfoRow(row SelectFull{{ entity_name }}InfoRow) *{{ entity_name }}SelectResult {
+	return &{{ entity_name }}SelectResult{
+		{% if embed_base %}
+		AbstractSelectResult: dto.AbstractSelectResult{
+			ID:              row.ID,
+			Dataowner:       row.Dataowner.String,
+			RegistDate:      row.RegistDate.Time,
+			EnableStartDate: row.EnableStartDate.Time,
+			EnableEndDate:   row.EnableEndDate.Time,
+			Version:         row.Version.Int64,
+		},
+		{% endif %}
+		{% for field in fields %}
+		{% if field.sql_null_type == "sql.NullString" %}
+		{{ field.name }}: row.{{ field.name }}.String,
+		{% elif field.sql_null_type == "sql.NullInt64" %}
+		{{ field.name }}: row.{{ field.name }}.Int64,
+		{% elif field.sql_null_type == "sql.NullInt32" %}
+		{{ field.name }}: row.{{ field.name }}.Int32,
+		{% elif field.sql_null_type == "sql.NullTime" %}
+		{{ field.name }}: row.{{ field.name }}.Time,
+		{% elif field.sql_null_type == "sql.NullBool" %}
+		{{ field.name }}: row.{{ field.name }}.Bool,
+		{% else %}
+		{{ field.name }}: row.{{ field.name }},
+		{% endif %}
+		{% endfor %}
+	}
+}
