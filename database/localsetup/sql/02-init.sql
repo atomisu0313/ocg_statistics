@@ -173,3 +173,26 @@ CREATE TABLE traps (
     enable_end_date TIMESTAMP DEFAULT '9999-12-31 23:59:59',
     version BIGINT DEFAULT 1
 );
+
+CREATE TABLE card_images (
+    id BIGSERIAL PRIMARY KEY,
+    ocg_api_image_id BIGINT UNIQUE NOT NULL,
+    ocg_api_card_id BIGINT NOT NULL,
+    card_id BIGINT,
+    image_url_small_api VARCHAR(1024) NOT NULL,
+    image_url_large_api VARCHAR(1024) NOT NULL,
+    image_url_cropped_api VARCHAR(1024) NOT NULL,
+    image_url_small_this_app VARCHAR(1024),
+    image_url_large_this_app VARCHAR(1024),
+    image_url_cropped_this_app VARCHAR(1024),
+    dataowner VARCHAR(255) DEFAULT 'system',
+    regist_date TIMESTAMP DEFAULT current_timestamp,
+    enable_start_date TIMESTAMP DEFAULT '1970-01-01 00:00:00',
+    enable_end_date TIMESTAMP DEFAULT '9999-12-31 23:59:59',
+    version BIGINT DEFAULT 1,
+    FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_card_images_card_id ON card_images(card_id);
+CREATE INDEX idx_card_images_ocg_api_card_id ON card_images(ocg_api_card_id);
+CREATE INDEX idx_card_images_sync_pending ON card_images(id) WHERE image_url_large_this_app IS NULL;
