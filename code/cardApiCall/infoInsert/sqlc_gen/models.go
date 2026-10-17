@@ -34,6 +34,24 @@ type Card struct {
 	Version         sql.NullInt64  `db:"version" json:"version"`
 }
 
+type CardImage struct {
+	ID                     int64          `db:"id" json:"id"`
+	OcgApiImageID          int64          `db:"ocg_api_image_id" json:"ocgApiImageId"`
+	OcgApiCardID           int64          `db:"ocg_api_card_id" json:"ocgApiCardId"`
+	CardID                 sql.NullInt64  `db:"card_id" json:"cardId"`
+	ImageUrlSmallApi       string         `db:"image_url_small_api" json:"imageUrlSmallApi"`
+	ImageUrlLargeApi       string         `db:"image_url_large_api" json:"imageUrlLargeApi"`
+	ImageUrlCroppedApi     string         `db:"image_url_cropped_api" json:"imageUrlCroppedApi"`
+	ImageUrlSmallThisApp   sql.NullString `db:"image_url_small_this_app" json:"imageUrlSmallThisApp"`
+	ImageUrlLargeThisApp   sql.NullString `db:"image_url_large_this_app" json:"imageUrlLargeThisApp"`
+	ImageUrlCroppedThisApp sql.NullString `db:"image_url_cropped_this_app" json:"imageUrlCroppedThisApp"`
+	Dataowner              sql.NullString `db:"dataowner" json:"dataowner"`
+	RegistDate             sql.NullTime   `db:"regist_date" json:"registDate"`
+	EnableStartDate        sql.NullTime   `db:"enable_start_date" json:"enableStartDate"`
+	EnableEndDate          sql.NullTime   `db:"enable_end_date" json:"enableEndDate"`
+	Version                sql.NullInt64  `db:"version" json:"version"`
+}
+
 type FusionMonster struct {
 	CardID          int64          `db:"card_id" json:"cardId"`
 	Dataowner       sql.NullString `db:"dataowner" json:"dataowner"`

@@ -36,6 +36,14 @@ func TestInsertCardInfo(t *testing.T) {
 			Race:      "Fairy",
 			Attribute: "LIGHT",
 			TypeLines: []string{"Monster", "Normal"}, // "Monster" を追加
+			CardImages: []cardrecord.CardImage{
+				{
+					ID:              27288416,
+					ImageUrlSmall:   "https://images.ygoprodeck.com/images/cards_small/27288416.jpg",
+					ImageUrlLarge:   "https://images.ygoprodeck.com/images/cards/27288416.jpg",
+					ImageUrlCropped: "https://images.ygoprodeck.com/images/cards_cropped/27288416.jpg",
+				},
+			},
 		}
 
 		cardID, err := neonUseCase.InsertCardInfo(context.Background(), sampleData)
@@ -52,6 +60,13 @@ func TestInsertCardInfo(t *testing.T) {
 		assert.Equal(t, sampleData.NameJa, resultsGet.NameJa)
 		assert.Equal(t, "天使族", resultsGet.RaceNameJa)
 		assert.Equal(t, "光", resultsGet.AttributeNameJa)
+
+		// カード画像テーブルに正しく挿入されたか確認
+		images, err := neonUseCase.GetCardImagesByCardID(context.Background(), cardID)
+		assert.NoError(t, err)
+		assert.Len(t, images, 1)
+		assert.Equal(t, int64(27288416), images[0].OcgApiImageID)
+		assert.Equal(t, "https://images.ygoprodeck.com/images/cards/27288416.jpg", images[0].ImageUrlLargeApi)
 
 		// 他のテーブルに挿入されていないことを確認
 		_, err = neonUseCase.GetSpellCardByID(context.Background(), cardID)

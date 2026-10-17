@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"atomisu.com/ocg-statics/infoInsert/dto/cardrecord"
+	"atomisu.com/ocg-statics/infoInsert/sqlc_gen"
 	"atomisu.com/ocg-statics/infoInsert/usecase"
 	"github.com/samber/do"
 )
@@ -25,7 +26,9 @@ type NeonUseCase interface {
 	GetMonsterCardExtendedByID(ctx context.Context, cardID int64) (cardrecord.MonsterCardSelectResultExtended, error)
 	GetMonsterTypeLinesEnByCardID(ctx context.Context, cardID int64) ([]string, error)
 	InsertCardInfo(ctx context.Context, cardInfo cardrecord.StandardCard) (int64, error)
+	InsertCardImageInfo(ctx context.Context, cardID int64, ocgApiCardID int64, images []cardrecord.CardImage) error
 	GetCardPatternByCardID(ctx context.Context, cardID int64) (cardrecord.CardPatternSelectResult, error)
+	GetCardImagesByCardID(ctx context.Context, cardID int64) ([]sqlc_gen.CardImage, error)
 }
 
 // NewNeonUseCase は、NeonUseCaseのコンストラクタです。

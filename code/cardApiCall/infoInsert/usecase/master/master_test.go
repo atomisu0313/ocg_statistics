@@ -608,6 +608,13 @@ func TestInsertCardInfo(t *testing.T) {
 				assert.ElementsMatch(t, tc.card.TypeLines, typeLines)
 
 			}
+
+			// 共通: TCG API経由で取得されたカード画像がcard_imagesテーブルに正しく登録されていることを確認
+			images, err := neonUseCase.GetCardImagesByCardID(context.Background(), cardID)
+			assert.NoError(t, err)
+			assert.NotEmpty(t, images)
+			assert.Equal(t, cardID, images[0].CardID.Int64)
+			assert.NotEmpty(t, images[0].ImageUrlLargeApi)
 		})
 	}
 

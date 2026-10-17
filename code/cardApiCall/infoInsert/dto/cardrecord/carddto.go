@@ -24,9 +24,10 @@ type StandardCard struct {
 	Attribute      string   `json:"attribute"`
 	LinkVal        int32    `json:"linkVal"`
 	TypeLines      []string `json:"typeLines"`
-	PendulumScale  int32    `json:"pendulumScale"`
-	PendulumTextJa string   `json:"pendulumTextJa"`
-	PendulumTextEn string   `json:"pendulumTextEn"`
+	PendulumScale  int32       `json:"pendulumScale"`
+	PendulumTextJa string      `json:"pendulumTextJa"`
+	PendulumTextEn string      `json:"pendulumTextEn"`
+	CardImages     []CardImage `json:"cardImages"`
 }
 
 func (s *StandardCard) ToInsertCardParamsExceptMonster() sqlc_gen.InsertCardParams {
@@ -71,6 +72,7 @@ func GenerateStandardCardFromNeuronAndTCGAPIResult(neuronExtractedData *NeuronEx
 		PendulumScale:  tcgAPICard.Scale,
 		PendulumTextJa: neuronExtractedData.PendulumTextJa,
 		PendulumTextEn: tcgAPICard.PendulumText,
+		CardImages:     tcgAPICard.CardImages,
 	}
 }
 
@@ -83,23 +85,31 @@ type NeuronExtractedData struct {
 	PendulumTextJa string
 }
 
+type CardImage struct {
+	ID              int64  `json:"id"`
+	ImageUrlSmall   string `json:"image_url_small"`
+	ImageUrlLarge   string `json:"image_url"`
+	ImageUrlCropped string `json:"image_url_cropped"`
+}
+
 // TcgApiCard は、TcgApiUseCaseの抽出データです。
 type TcgApiCard struct {
-	Desc                  string   `json:"desc"`
-	Name                  string   `json:"name"`
-	ID                    int64    `json:"id"`
-	Def                   int32    `json:"def"`
-	Atk                   int32    `json:"atk"`
-	Type                  string   `json:"type"`
-	Level                 int32    `json:"level"`
-	Race                  string   `json:"race"`
-	LinkMarkers           []string `json:"linkMarkers"`
-	Attribute             string   `json:"attribute"`
-	LinkVal               int32    `json:"linkVal"`
-	TypeLines             []string `json:"typeline"`
-	HumanReadableCardType string   `json:"humanReadableCardType"`
-	Scale                 int32    `json:"scale"`
-	PendulumText          string   `json:"pendulumText"`
+	Desc                  string      `json:"desc"`
+	Name                  string      `json:"name"`
+	ID                    int64       `json:"id"`
+	Def                   int32       `json:"def"`
+	Atk                   int32       `json:"atk"`
+	Type                  string      `json:"type"`
+	Level                 int32       `json:"level"`
+	Race                  string      `json:"race"`
+	LinkMarkers           []string    `json:"linkMarkers"`
+	Attribute             string      `json:"attribute"`
+	LinkVal               int32       `json:"linkVal"`
+	TypeLines             []string    `json:"typeline"`
+	HumanReadableCardType string      `json:"humanReadableCardType"`
+	Scale                 int32       `json:"scale"`
+	PendulumText          string      `json:"pendulumText"`
+	CardImages            []CardImage `json:"card_images"`
 }
 
 type CardPatternSelectResult struct {
