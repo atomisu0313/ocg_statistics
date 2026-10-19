@@ -1,22 +1,8 @@
-version: '3.8'
-
 services:
-  cardapicall_sample:
-    build:
-      context: ./code/cardApiCall/sample
-      dockerfile: Dockerfile
-    container_name: ocg_cardapicall_sample
-    ports:
-      - "9000:8080"
-    entrypoint: /usr/local/bin/aws-lambda-rie
-    command: ./main
-    restart: unless-stopped
-    networks:
-      - ocg-network
   cardapicall_idcheck:
     build:
-      context: ./code/cardApiCall/cardidcheck
-      dockerfile: Dockerfile
+      context: ./code/cardApiCall
+      dockerfile: ./cmd/aws_lambda/cardIdCheck/Dockerfile
     container_name: ocg_cardapicall_idcheck
     ports:
       - "9001:8080"
@@ -27,8 +13,8 @@ services:
       - ocg-network
   cardapicall_infoinsert:
     build:
-      context: ./code/cardApiCall/infoInsert
-      dockerfile: Dockerfile
+      context: ./code/cardApiCall
+      dockerfile: ./cmd/aws_lambda/cardInfoInsert/Dockerfile
     container_name: ocg_cardapicall_infoinsert
     ports:
       - "9002:8080"
@@ -42,8 +28,25 @@ services:
     restart: unless-stopped
     networks:
       - ocg-network
+  cardapicall_syncstorageimage:
+    build:
+      context: ./code/cardApiCall
+      dockerfile: ./cmd/aws_lambda/syncStorageImageWithDB/Dockerfile
+    container_name: ocg_cardapicall_syncstorageimage
+    ports:
+      - "9003:8080"
+    environment:
+      PG_DB_USER: postgres
+      PG_DB_PASSWORD: postgres
+      PG_DB_HOST_PORT: ocg_db_local:5432
+      PG_DB_NAME: postgres
+    entrypoint: /usr/local/bin/aws-lambda-rie
+    command: ./main
+    restart: unless-stopped
+    networks:
+      - ocg-network
   ocg_db_local:
-    image: postgres:14.7-alpine
+    image: postgres:16.7-bookworm
     container_name: 'ocg-db-local'
     ports:
       - '5555:5432'
@@ -54,6 +57,7 @@ services:
     volumes:
       - ./database/localsetup:/docker-entrypoint-initdb.d
       - postgres_volume_ocg:/var/lib/postgresql/data
+    command: -c ssl=on -c ssl_cert_file=/etc/ssl/certs/ssl-cert-snakeoil.pem -c ssl_key_file=/etc/ssl/private/ssl-cert-snakeoil.key
     networks:
       - ocg-network
 volumes:

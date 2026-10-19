@@ -28,7 +28,7 @@
 |---|---|---|
 | **[00_infra/](./00_infra/README.md)** | インフラ・環境運用 | AWS、Neon DB、OpenTofu 構成、主要デプロイスクリプト一覧 |
 | **[01_data_prepare/](./01_data_prepare)** | データ準備・モデリング | [カードクラス図 (card_class_diagram.md)](./01_data_prepare/card_class_diagram.md)、実装対応表、データ準備アクティビティ図 |
-| **[02_go_architecture/](./02_go_architecture)** | Go アーキテクチャ | レイヤー責務、[DTO 設計方針 (05_dto_design_policy.md)](./02_go_architecture/05_dto_design_policy.md)、トランザクションパターン、DI パターン、[コードテンプレート集](./02_go_architecture/templates/README.md) |
+| **[02_go_architecture/](./02_go_architecture)** | Go アーキテクチャ | レイヤー責務、[DTO 設計方針 (05_dto_design_policy.md)](./02_go_architecture/05_dto_design_policy.md)、[マルチ Lambda パッケージ構成 (06_multi_lambda_package_architecture.md)](./02_go_architecture/06_multi_lambda_package_architecture.md)、トランザクションパターン、DI パターン、[コードテンプレート集](./02_go_architecture/templates/README.md) |
 | **[03_card_image/](./03_card_image/README.md)** | カード画像機能 | 画像取得・S3 保存パイプラインアーキテクチャ、詳細実装ガイド |
 | **[04_new_tables/](./04_new_tables/README.md)** | 新規テーブル追加 | [新規テーブル追加・実装完全ガイド (01_new_table_implementation_guide.md)](./04_new_tables/01_new_table_implementation_guide.md) |
 | **[X_important/](./X_important/README.md)** | 重要遵守ルール | 開発者が遵守すべき共通・Lambda・インフラの厳格ルール集 |

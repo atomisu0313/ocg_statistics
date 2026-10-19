@@ -4,7 +4,8 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - 'code/cardApiCall/cardidcheck/**'
+      - 'code/cardApiCall/cmd/aws_lambda/cardIdCheck/**'
+      - '.github/workflows/lamda-idcheck-deploy.yml'
   workflow_dispatch:
 
 env:
@@ -12,7 +13,8 @@ env:
   # ECRリポジトリ名とLambda関数名をSecretsから読み込む
   ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_NAME_IDCHECK }}
   LAMBDA_FUNCTION_NAME: ${{ secrets.LAMBDA_FUNCTION_NAME_IDCHECK }}
-  IMAGE_WORKDIR: ./code/cardApiCall/cardidcheck
+  BUILD_CONTEXT: ./code/cardApiCall
+  DOCKERFILE_PATH: ./code/cardApiCall/cmd/aws_lambda/cardIdCheck/Dockerfile
 
 jobs:
   build-and-push:
@@ -46,7 +48,7 @@ jobs:
       run: |
         IMAGE_URI_TIMESTAMP="$ECR_REGISTRY/$IMAGE_NAME:$TIMESTAMP"
         IMAGE_URI_LATEST="$ECR_REGISTRY/$IMAGE_NAME:latest"
-        docker build -t "$IMAGE_URI_TIMESTAMP" -t "$IMAGE_URI_LATEST" -f ${{ env.IMAGE_WORKDIR }}/Dockerfile ${{ env.IMAGE_WORKDIR }}
+        docker build -t "$IMAGE_URI_TIMESTAMP" -t "$IMAGE_URI_LATEST" -f ${{ env.DOCKERFILE_PATH }} ${{ env.BUILD_CONTEXT }}
         docker push "$IMAGE_URI_TIMESTAMP"
         docker push "$IMAGE_URI_LATEST"
         echo "image_uri=$IMAGE_URI_TIMESTAMP" >> $GITHUB_OUTPUT

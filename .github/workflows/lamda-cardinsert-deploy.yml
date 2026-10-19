@@ -1,10 +1,12 @@
-name: OCG Card API Docker CI (for ID Check)
+name: OCG Card API Docker CI (for Card Info Insert)
 
 on:
   push:
     branches: [ "main" ]
     paths:
-      - 'code/cardApiCall/infoInsert/**'
+      - 'code/cardApiCall/internal/**'
+      - 'code/cardApiCall/cmd/aws_lambda/cardInfoInsert/**'
+      - '.github/workflows/lamda-cardinsert-deploy.yml'
   workflow_dispatch:
 
 env:  
@@ -12,7 +14,8 @@ env:
   # ECRリポジトリ名とLambda関数名をSecretsから読み込む
   ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_NAME_CARDINSERT }}
   LAMBDA_FUNCTION_NAME: ${{ secrets.LAMBDA_FUNCTION_NAME_CARDINSERT }}
-  IMAGE_WORKDIR: ./code/cardApiCall/infoInsert
+  BUILD_CONTEXT: ./code/cardApiCall
+  DOCKERFILE_PATH: ./code/cardApiCall/cmd/aws_lambda/cardInfoInsert/Dockerfile
 
 jobs:
   build-and-push:
@@ -46,7 +49,7 @@ jobs:
       run: |
         IMAGE_URI_TIMESTAMP="$ECR_REGISTRY/$IMAGE_NAME:$TIMESTAMP"
         IMAGE_URI_LATEST="$ECR_REGISTRY/$IMAGE_NAME:latest"
-        docker build -t "$IMAGE_URI_TIMESTAMP" -t "$IMAGE_URI_LATEST" -f ${{ env.IMAGE_WORKDIR }}/Dockerfile ${{ env.IMAGE_WORKDIR }}
+        docker build -t "$IMAGE_URI_TIMESTAMP" -t "$IMAGE_URI_LATEST" -f ${{ env.DOCKERFILE_PATH }} ${{ env.BUILD_CONTEXT }}
         docker push "$IMAGE_URI_TIMESTAMP"
         docker push "$IMAGE_URI_LATEST"
         echo "image_uri=$IMAGE_URI_TIMESTAMP" >> $GITHUB_OUTPUT

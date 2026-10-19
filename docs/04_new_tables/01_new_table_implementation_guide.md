@@ -1,6 +1,6 @@
 # 新規テーブル追加・実装完全ガイド (New Table Implementation Workflow Guide)
 
-本ドキュメントは、本リポジトリ（`ocg_statistics`）において**新規テーブルを追加・マイグレーションし、コードテンプレートを活用して Go アプリケーション（`code/cardApiCall/infoInsert`）の各レイヤーへ安全に組み込むための標準実装手順書**です。
+本ドキュメントは、本リポジトリ（`ocg_statistics`）において**新規テーブルを追加・マイグレーションし、コードテンプレートを活用して Go アプリケーション（`code/cardApiCall/infoInsert`）などの各レイヤーへ安全に組み込むための標準実装手順書**です。
 
 ---
 
@@ -128,16 +128,16 @@ bash scripts/database/remote_migration_up.sh
 
 ## 3. フェーズ 2: sqlc スキーマ・クエリ更新とコード生成
 
-[code/cardApiCall/infoInsert](../../code/cardApiCall/infoInsert) では、SQL から型安全な Go コードを自動生成するツールとして [sqlc](https://sqlc.dev/) を採用しています。
+[code/cardApiCall/internal](../../code/cardApiCall/internal)（および互換性維持のための既存 `infoInsert`）では、SQL から型安全な Go コードを自動生成するツールとして [sqlc](https://sqlc.dev/) を採用しています。マルチ Lambda 共通基盤として `code/cardApiCall/internal/` 配下で一元管理されています（詳細は [docs/02_go_architecture/06_multi_lambda_package_architecture.md](../02_go_architecture/06_multi_lambda_package_architecture.md) 参照）。
 
 ### 3.1 `schema.sql` への DDL 反映（必須）
 
-sqlc はマイグレーションディレクトリではなく、[code/cardApiCall/infoInsert/sqlc/db/schema.sql](../../code/cardApiCall/infoInsert/sqlc/db/schema.sql) を参照してコード生成を行います。
+sqlc はマイグレーションディレクトリではなく、[code/cardApiCall/internal/sqlc/db/schema.sql](../../code/cardApiCall/internal/sqlc/db/schema.sql) を参照してコード生成を行います。
 新しく作成したテーブルの `CREATE TABLE` 文を `schema.sql` の末尾に追加してください。
 
 ### 3.2 テンプレートを活用したクエリ定義ファイルの作成 (`.sql`)
 
-[code/cardApiCall/infoInsert/sqlc/queries/](../../code/cardApiCall/infoInsert/sqlc/queries) 配下に新規テーブル用の `.sql` ファイル（例: `card_pack.sql`）を作成します。
+[code/cardApiCall/internal/sqlc/queries/](../../code/cardApiCall/internal/sqlc/queries) 配下に新規テーブル用の `.sql` ファイル（例: `card_pack.sql`）を作成します。
 
 ゼロから書くのではなく、[docs/02_go_architecture/templates/sqlc_query.sql.jinja](../02_go_architecture/templates/sqlc_query.sql.jinja) を活用して CRUD や JOIN クエリの骨格を定義します。
 
@@ -190,16 +190,15 @@ WHERE id = $1;
 
 ### 3.3 `sqlc generate` によるコード自動生成
 
-クエリ定義を記述したら、以下のコマンドで Go コードを再生成します。
+クエリ定義を記述したら、以下のスクリプト（または internal ディレクトリ）で Go コードを再生成します。
 
 ```bash
-# infoInsert ディレクトリに移動してコード生成を実行
-cd code/cardApiCall/infoInsert
-sqlc generate
+# スクリプトを実行してコード生成
+bash scripts/code/cardApiCall/internal/sqlc_generate.sh
 ```
 
 > [!TIP]
-> 生成されたモデルやクエリ関数は [code/cardApiCall/infoInsert/sqlc_gen/](../../code/cardApiCall/infoInsert/sqlc_gen) に配置されます。このディレクトリ内のコードは手動で直接編集しないでください。
+> 生成されたモデルやクエリ関数は [code/cardApiCall/internal/sqlc_gen/](../../code/cardApiCall/internal/sqlc_gen) に配置されます。このディレクトリ内のコードは手動で直接編集しないでください。
 
 ---
 

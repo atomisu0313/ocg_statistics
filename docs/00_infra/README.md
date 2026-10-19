@@ -43,7 +43,9 @@ ocg_statistics/
 
 | 対象 | スクリプトパス | 概要 |
 |---|---|---|
-| **コンテナデプロイ** | [`scripts/code/cardApiCall/infoinsert/build_and_push_to_ecr.sh`](../../scripts/code/cardApiCall/infoinsert/build_and_push_to_ecr.sh) | infoInsert コンテナの Docker ビルド・タグ付け・ECR プッシュ |
+| **コンテナデプロイ (cardInfoInsert)** | [`scripts/code/cardApiCall/cardinfoinsert/build_and_push_to_ecr.sh`](../../scripts/code/cardApiCall/cardinfoinsert/build_and_push_to_ecr.sh) | cardInfoInsert コンテナの Docker ビルド・タグ付け・ECR プッシュ |
+| **コンテナデプロイ (syncStorageImage)** | [`scripts/code/cardApiCall/syncstorageimage/build_and_push_to_ecr.sh`](../../scripts/code/cardApiCall/syncstorageimage/build_and_push_to_ecr.sh) | syncStorageImage コンテナの Docker ビルド・タグ付け・ECR プッシュ |
+| **コンテナデプロイ (旧 infoInsert 互換)** | [`scripts/code/cardApiCall/infoinsert/build_and_push_to_ecr.sh`](../../scripts/code/cardApiCall/infoinsert/build_and_push_to_ecr.sh) | 旧 infoInsert コンテナのビルド・プッシュ（互換性維持） |
 | **DB マイグレーション (Remote)** | [`scripts/database/remote_migration_up.sh`](../../scripts/database/remote_migration_up.sh) | Neon DB に対する golang-migrate の Up 適用 |
 | **DB マイグレーション (Local)** | [`scripts/database/local_migration_up.sh`](../../scripts/database/local_migration_up.sh) | ローカル Docker PostgreSQL への Up 適用 |
 | **パラメータ更新** | [`scripts/aws/preparemaster/update_current_id.sh`](../../scripts/aws/preparemaster/update_current_id.sh) | AWS Systems Manager (SSM) パラメータストアの更新 |
