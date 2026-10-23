@@ -14,68 +14,131 @@ data "terraform_remote_state" "base" {
 
 # Local variables for constructing the ECR image URI.
 locals {
-  image_tag = "latest"
+  image_tag  = "latest"
   account_id = data.aws_caller_identity.current.account_id
 
   # Construct the full ECR image URI dynamically using the created repository's URL.
-  image_uri_sample = "${data.terraform_remote_state.base.outputs.ecr_lambda_sample_repository_url}:${local.image_tag}"
-  image_uri_idcheck = "${data.terraform_remote_state.base.outputs.ecr_lambda_idcheck_repository_url}:${local.image_tag}"
-  image_uri_cardinsert = "${data.terraform_remote_state.base.outputs.ecr_lambda_cardinsert_repository_url}:${local.image_tag}"
+  image_uri_sample           = "${data.terraform_remote_state.base.outputs.ecr_lambda_sample_repository_url}:${local.image_tag}"
+  image_uri_idcheck          = "${data.terraform_remote_state.base.outputs.ecr_lambda_idcheck_repository_url}:${local.image_tag}"
+  image_uri_cardinsert       = "${data.terraform_remote_state.base.outputs.ecr_lambda_cardinsert_repository_url}:${local.image_tag}"
+  image_uri_syncstorageimage = try("${data.terraform_remote_state.base.outputs.ecr_lambda_syncstorageimage_repository_url}:${local.image_tag}", "${local.account_id}.dkr.ecr.${var.region}.amazonaws.com/${var.project}/syncstorageimage:${local.image_tag}")
 }
 
 module "lambda_sample" {
   source = "../../../modules/lambda/sample"
 
   lambda_name = var.lambda_sample_name
-  tag_base = var.tag_base
-  role_arn = data.terraform_remote_state.base.outputs.lambda_exec_role_arn
-  image_uri = local.image_uri_sample
+  tag_base    = var.tag_base
+  role_arn    = data.terraform_remote_state.base.outputs.lambda_exec_role_arn
+  image_uri   = local.image_uri_sample
 }
 
 module "lambda_idcheck" {
   source = "../../../modules/lambda/idcheck"
 
   lambda_name = var.lambda_idcheck_name
-  tag_base = var.tag_base
-  role_arn = data.terraform_remote_state.base.outputs.lambda_exec_role_arn
-  image_uri = local.image_uri_idcheck
+  tag_base    = var.tag_base
+  role_arn    = data.terraform_remote_state.base.outputs.lambda_exec_role_arn
+  image_uri   = local.image_uri_idcheck
 }
 
 module "lambda_cardinsert" {
   source = "../../../modules/lambda/cardinsert"
 
   lambda_name = var.lambda_cardinsert_name
-  tag_base = var.tag_base
-  role_arn = data.terraform_remote_state.base.outputs.lambda_exec_role_arn
-  image_uri = local.image_uri_cardinsert
+  tag_base    = var.tag_base
+  role_arn    = data.terraform_remote_state.base.outputs.lambda_exec_role_arn
+  image_uri   = local.image_uri_cardinsert
   environment = {
-    PG_DB_USER = var.lambda_cardinsert_env_pg_db_user
-    PG_DB_PASSWORD = var.lambda_cardinsert_env_pg_db_password
+    PG_DB_USER      = var.lambda_cardinsert_env_pg_db_user
+    PG_DB_PASSWORD  = var.lambda_cardinsert_env_pg_db_password
     PG_DB_HOST_PORT = var.lambda_cardinsert_env_pg_db_host_port
-    PG_DB_NAME = var.lambda_cardinsert_env_pg_db_name
+    PG_DB_NAME      = var.lambda_cardinsert_env_pg_db_name
   }
 }
+
+module "lambda_syncstorageimage" {
+  source = "../../../modules/lambda/syncStorageImage"
+
+  lambda_name = var.lambda_syncstorageimage_name
+  tag_base    = var.tag_base
+  role_arn    = data.terraform_remote_state.base.outputs.lambda_exec_role_arn
+  image_uri   = local.image_uri_syncstorageimage
+  environment = {
+    S3_BUCKET_NAME         = module.s3_card_image.bucket_name
+    PG_DB_USER             = var.lambda_cardinsert_env_pg_db_user
+    PG_DB_PASSWORD         = var.lambda_cardinsert_env_pg_db_password
+    PG_DB_HOST_PORT        = var.lambda_cardinsert_env_pg_db_host_port
+    PG_DB_NAME             = var.lambda_cardinsert_env_pg_db_name
+    IMAGE_SYNC_CONCURRENCY = "5"
+  }
+
+}
+
 
 module "parameter_current_id" {
   source = "../../../modules/parameterstore/currentid"
 
-  parameter_name = var.parameter_current_id_name
+  parameter_name  = var.parameter_current_id_name
   parameter_value = var.parameter_current_id_value
-  tag_base = var.tag_base
+  tag_base        = var.tag_base
 }
 
 module "parameter_delta_id" {
   source = "../../../modules/parameterstore/deltaid"
 
-  parameter_name = var.parameter_delta_id_name
+  parameter_name  = var.parameter_delta_id_name
   parameter_value = var.parameter_delta_id_value
-  tag_base = var.tag_base
+  tag_base        = var.tag_base
 }
 
 module "parameter_max_id" {
   source = "../../../modules/parameterstore/maxid"
 
-  parameter_name = var.parameter_max_id_name
+  parameter_name  = var.parameter_max_id_name
   parameter_value = var.parameter_max_id_value
-  tag_base = var.tag_base
+  tag_base        = var.tag_base
+}
+
+module "s3_card_image" {
+  source = "../../../modules/s3/cardImage"
+
+  bucket_name = var.s3_card_image_bucket_name
+  tag_base    = var.tag_base
+}
+
+resource "aws_iam_role_policy" "lambda_s3_image_sync" {
+  name = "${var.project}-lambda-s3-image-sync-policy"
+  role = split("/", data.terraform_remote_state.base.outputs.lambda_exec_role_arn)[1]
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowS3CardImageSyncOperations"
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:GetObject",
+          "s3:HeadObject"
+        ]
+        Resource = "${module.s3_card_image.bucket_arn}/cards/*"
+      },
+      {
+        Sid    = "AllowListBucketForExistenceCheck"
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket"
+        ]
+        Resource = module.s3_card_image.bucket_arn
+        Condition = {
+          StringLike = {
+            "s3:prefix" = [
+              "cards/*"
+            ]
+          }
+        }
+      }
+    ]
+  })
 }

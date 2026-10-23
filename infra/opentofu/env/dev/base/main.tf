@@ -45,3 +45,10 @@ module "ecr_cardinsert" {
   repo_name = var.ecr_lambda_cardinsert_repo_name
   tag_base                    = var.tag_base
 }
+
+module "ecr_syncstorageimage" {
+  source = "../../../modules/ecr/syncStorageImage"
+
+  repo_name = var.ecr_lambda_syncstorageimage_repo_name
+  tag_base  = var.tag_base
+}

@@ -8,3 +8,5 @@ tag_base                    = "ocg-statistics-dev"
 ecr_lambda_sample_repo_name = "ocg-sample-repo"
 ecr_lambda_idcheck_repo_name = "ocg-idcheck-repo"
 ecr_lambda_cardinsert_repo_name = "ocg-cardinsert-repo"
+ecr_lambda_syncstorageimage_repo_name = "ocg-syncstorageimage-repo"
+

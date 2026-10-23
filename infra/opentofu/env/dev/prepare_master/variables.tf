@@ -55,7 +55,7 @@ variable "lambda_cardinsert_env_pg_db_name" {
 
 variable "parameter_current_id_name" {
   description = "The name of the SSM parameter."
-  type        = string 
+  type        = string
 }
 
 variable "parameter_current_id_value" {
@@ -65,7 +65,7 @@ variable "parameter_current_id_value" {
 
 variable "parameter_delta_id_name" {
   description = "The name of the SSM parameter."
-  type        = string 
+  type        = string
 }
 
 variable "parameter_delta_id_value" {
@@ -75,10 +75,22 @@ variable "parameter_delta_id_value" {
 
 variable "parameter_max_id_name" {
   description = "The name of the SSM parameter."
-  type        = string 
+  type        = string
 }
 
 variable "parameter_max_id_value" {
   description = "The value of the SSM parameter."
   type        = string
 }
+
+variable "s3_card_image_bucket_name" {
+  description = "The name of the S3 bucket for card images."
+  type        = string
+}
+
+variable "lambda_syncstorageimage_name" {
+  description = "The name of the syncStorageImage Lambda function."
+  type        = string
+}
+
+

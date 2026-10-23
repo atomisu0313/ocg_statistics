@@ -12,6 +12,7 @@
   - **[共通ルール](./X_important/common/rules/README.md)**:
     - [01_new_table_creation_rules.md](./X_important/common/rules/01_new_table_creation_rules.md): 新規テーブル追加時の厳格ルール
     - [02_doc_code_synchronization_rules.md](./X_important/common/rules/02_doc_code_synchronization_rules.md): コード修正時の docs ドキュメント見直し・同期原則
+    - [03_security_and_credential_rules.md](./X_important/common/rules/03_security_and_credential_rules.md): リモート認証情報・パスワード保護原則
   - **[Lambda / Go アプリ開発ルール](./X_important/lambda/rules/README.md)**:
     - [01_transaction_boundary_rules.md](./X_important/lambda/rules/01_transaction_boundary_rules.md): トランザクション境界配置原則
     - [02_related_fields_unit_test_rules.md](./X_important/lambda/rules/02_related_fields_unit_test_rules.md): 関連フィールド単体テスト原則
@@ -31,4 +32,5 @@
 | **[02_go_architecture/](./02_go_architecture)** | Go アーキテクチャ | レイヤー責務、[DTO 設計方針 (05_dto_design_policy.md)](./02_go_architecture/05_dto_design_policy.md)、[マルチ Lambda パッケージ構成 (06_multi_lambda_package_architecture.md)](./02_go_architecture/06_multi_lambda_package_architecture.md)、トランザクションパターン、DI パターン、[コードテンプレート集](./02_go_architecture/templates/README.md) |
 | **[03_card_image/](./03_card_image/README.md)** | カード画像機能 | 画像取得・S3 保存パイプラインアーキテクチャ、詳細実装ガイド |
 | **[04_new_tables/](./04_new_tables/README.md)** | 新規テーブル追加 | [新規テーブル追加・実装完全ガイド (01_new_table_implementation_guide.md)](./04_new_tables/01_new_table_implementation_guide.md) |
+| **[05_sync_images/](./05_sync_images/README.md)** | カード画像 S3 同期 | [S3 画像同期 API 仕様書 (01_sync_storage_images_api_specification.md)](./05_sync_images/01_sync_storage_images_api_specification.md)、[インフラ準備・要件定義書 (02_infrastructure_and_prerequisites_guide.md)](./05_sync_images/02_infrastructure_and_prerequisites_guide.md) |
 | **[X_important/](./X_important/README.md)** | 重要遵守ルール | 開発者が遵守すべき共通・Lambda・インフラの厳格ルール集 |
