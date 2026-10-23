@@ -155,7 +155,7 @@ type ImageSyncTaskDTO struct {
 
 ### 4.3 Step 3: ダウンロードからの Stream プッシュ
 1. **ストリーミングアップロードパイプライン**:
-   - `http.Get(task.SourceURL)` で取得した `response.Body`（`io.ReadCloser`）をメモリに一括ロード（`io.ReadAll`）せず、AWS SDK の S3 Uploader（`feature/s3/manager` または `io.Pipe`）に直接渡してアップロードを実行する。
+   - `http.Get(task.SourceURL)` で取得した `response.Body`（`io.ReadCloser`）をメモリに一括ロード（`io.ReadAll`）せず、AWS SDK の S3 Transfer Manager（`feature/s3/transfermanager`）に直接渡してアップロードを実行する。
    - これにより、大量の画像処理時にも Lambda のメモリ消費量（フットプリント）を最小限（数 MB 程度）に抑える。
 2. **並行処理と流量制御**:
    - 外部 CDN への過剰リクエスト（DDoS判定・Rate Limit）を回避するため、WorkerPool（Go Goroutine + バッファ付きチャネル/セマフォ）を用いて同時並行ダウンロード数を制御（例: デフォルト 5 並行）する。

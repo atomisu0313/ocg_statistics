@@ -75,6 +75,7 @@ func TestInsertCardInfo(t *testing.T) {
 		assert.Error(t, err) // Should be an error (not found)
 
 		cardPattern, err := neonUseCase.GetCardPatternByCardID(context.Background(), cardID)
+		assert.NoError(t, err)
 		assert.True(t, cardPattern.IsMonster)
 		assert.False(t, cardPattern.IsSpell)
 		assert.False(t, cardPattern.IsTrap)
@@ -111,6 +112,7 @@ func TestInsertCardInfo(t *testing.T) {
 		assert.Equal(t, "通常", result.SpellTypeNameJa)
 
 		cardPattern, err := neonUseCase.GetCardPatternByCardID(context.Background(), cardID)
+		assert.NoError(t, err)
 		assert.False(t, cardPattern.IsMonster)
 		assert.True(t, cardPattern.IsSpell)
 		assert.False(t, cardPattern.IsTrap)
@@ -159,6 +161,7 @@ func TestInsertCardInfo(t *testing.T) {
 		assert.Error(t, err) // Should be an error (not found)
 
 		cardPattern, err := neonUseCase.GetCardPatternByCardID(context.Background(), cardID)
+		assert.NoError(t, err)
 		assert.False(t, cardPattern.IsMonster)
 		assert.False(t, cardPattern.IsSpell)
 		assert.True(t, cardPattern.IsTrap)

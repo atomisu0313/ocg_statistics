@@ -34,3 +34,13 @@
 | **[04_new_tables/](./04_new_tables/README.md)** | 新規テーブル追加 | [新規テーブル追加・実装完全ガイド (01_new_table_implementation_guide.md)](./04_new_tables/01_new_table_implementation_guide.md) |
 | **[05_sync_images/](./05_sync_images/README.md)** | カード画像 S3 同期 | [S3 画像同期 API 仕様書 (01_sync_storage_images_api_specification.md)](./05_sync_images/01_sync_storage_images_api_specification.md)、[インフラ準備・要件定義書 (02_infrastructure_and_prerequisites_guide.md)](./05_sync_images/02_infrastructure_and_prerequisites_guide.md) |
 | **[X_important/](./X_important/README.md)** | 重要遵守ルール | 開発者が遵守すべき共通・Lambda・インフラの厳格ルール集 |
+
+---
+
+## 3. 技術検証ナレッジ集 (Technical Knowledge)
+
+システムのアーキテクチャ変遷、トラブルシューティング、調査検証結果を記録した完全独立ナレッジ集です。
+
+- **[AWS SDK Go v2 Transfer Manager 移行と静的解析（Staticcheck）品質一掃](./knowledge_aws_sdk_s3_transfermanager_migration_and_linter_sweep.md)**
+  - `feature/s3/manager` の非推奨化と `feature/s3/transfermanager` への統合刷新、および静的解析（SA1019/SA4006）によるエラー握りつぶし撲滅の完全記録。
+

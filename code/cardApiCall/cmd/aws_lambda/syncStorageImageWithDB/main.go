@@ -6,39 +6,32 @@ import (
 	"fmt"
 
 	"atomisu.com/ocg-statics/cardApiCall/cmd/aws_lambda/syncStorageImageWithDB/app"
+	"atomisu.com/ocg-statics/cardApiCall/internal/dto"
 	"atomisu.com/ocg-statics/cardApiCall/internal/usecase/syncimage"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/samber/do"
 )
 
-type Input struct {
-	StartId int64 `json:"startId"`
-	Delta   int64 `json:"delta"`
-}
-
-type Output struct {
-	FailedIds []int64 `json:"failedIds"`
-}
-
 var globalInjector = app.SetupDIContainer()
 
-func HandleRequest(ctx context.Context, event json.RawMessage) (Output, error) {
-	var input Input
+// HandleRequest は syncStorageImageWithDB Lambda 関数のリクエストハンドラーです。
+func HandleRequest(ctx context.Context, event json.RawMessage) (*dto.SyncImagesOutput, error) {
+	var input dto.SyncImagesInput
 	if err := json.Unmarshal(event, &input); err != nil {
-		return Output{}, err
+		return nil, fmt.Errorf("failed to unmarshal request event: %w", err)
 	}
 
-	if input.Delta <= 0 {
-		return Output{}, fmt.Errorf("delta must be > 0")
+	if len(input.OcgCardIds) == 0 {
+		return nil, fmt.Errorf("ocgCardIds must not be empty")
 	}
 
 	syncUseCase := do.MustInvoke[syncimage.SyncStorageImageUseCase](globalInjector)
-	failedIds, err := syncUseCase.SyncStorageImages(ctx, input.StartId, input.Delta)
+	output, err := syncUseCase.SyncStorageImagesByCardIDs(ctx, input.OcgCardIds)
 	if err != nil {
-		return Output{}, err
+		return nil, err
 	}
 
-	return Output{FailedIds: failedIds}, nil
+	return output, nil
 }
 
 func main() {

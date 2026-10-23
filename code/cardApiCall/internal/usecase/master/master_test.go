@@ -597,6 +597,7 @@ func TestInsertCardInfo(t *testing.T) {
 				}
 			default:
 				monster, err := neonUseCase.GetMonsterCardExtendedByID(context.Background(), cardID)
+				assert.NoError(t, err)
 				assert.NotNil(t, monster)
 				assert.Equal(t, tc.card.NameEn, monster.NameEn)
 				assert.Equal(t, tc.card.NameJa, monster.NameJa)
