@@ -54,7 +54,6 @@ ocg_statistics/
 
 ## 4. ドキュメント一覧
 
-今後、インフラ設計や手順の追加時は本ディレクトリに連番付きでドキュメントを追加・保守してください。
-
+- [01_local_infrastructure_docker_compose.md](./01_local_infrastructure_docker_compose.md): **ローカルインフラ検証環境 (Docker Compose) とポート一覧**
 - [インフラ運用ルール索引](../X_important/infra/rules/README.md)
 - [スクリプト外デプロイ禁止ルール](../X_important/infra/rules/01_script_only_infra_deployment_rules.md)
