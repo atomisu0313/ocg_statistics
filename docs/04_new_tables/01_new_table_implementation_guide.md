@@ -112,8 +112,10 @@ bash scripts/database/local_migration_down.sh
 bash scripts/database/local_migration_up.sh
 ```
 
-> [!NOTE]
-> 初期化スクリプト [database/localsetup/sql/](../../database/localsetup/sql) はコンテナ初回構築時用のフルダンプです。開発中のスキーマ変更はマイグレーションファイル経由で適用します。
+> [!IMPORTANT]
+> **初期化スクリプトとマイグレーションの完全同期義務**:
+> 初期化スクリプト [database/localsetup/sql/02-init.sql](../../database/localsetup/sql/02-init.sql) はローカルコンテナ初回構築時の DDL 定義です。
+> テーブルの追加・変更時は、[database/migrate/db/migrations/](../../database/migrate/db/migrations) の `*.up.sql` / `*.down.sql` だけでなく、必ず `02-init.sql` および `code/cardApiCall/internal/sqlc/db/schema.sql` にも同一の DDL を同期してください。また、`down.sql` では外部キー参照関係（子テーブルから先に DROP）を厳守してください。
 
 ### 2.4 リモート DB (Neon) への適用
 
