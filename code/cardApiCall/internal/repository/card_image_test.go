@@ -72,6 +72,11 @@ func TestCardImageRepository(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, imagesByApiID, 2)
 
+		// 4-2. neuron_id (4005) でも一覧取得できること（Airflow / Neuron CID 連携対応）
+		imagesByNeuronID, err := cardImageRepo.ListCardImagesByOcgApiCardID(ctx, 4005)
+		assert.NoError(t, err)
+		assert.Len(t, imagesByNeuronID, 2)
+
 		// 5. 未同期リスト（this_app が NULL のもの）の取得
 		pending, err := cardImageRepo.ListPendingSyncCardImages(ctx, 10)
 		assert.NoError(t, err)
