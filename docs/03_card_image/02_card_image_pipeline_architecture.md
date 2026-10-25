@@ -114,7 +114,7 @@ flowchart LR
     Branch -->|"正常"| InsertLambda["invoke_lambda_function<br/>(cardInfoInsert Lambda)"]
     GenIDs -.->|"ocgCardIds"| InsertLambda
     InsertLambda --> SyncLambda["invoke_sync_image_lambda<br/>(syncStorageImageWithDB Lambda)"]
-    GenIDs -.->|"ocgCardIds"| SyncLambda
+    GenIDs -.->|"neuronCardIds"| SyncLambda
     SyncLambda --> UpdateID["update_current_id<br/>(SSM更新)"]
     Alarm --> EndUpdate["end_update_task"]
     UpdateID --> EndUpdate
@@ -122,8 +122,8 @@ flowchart LR
 ```
 
 ### 5.2 各タスクの責務
-1. **`generate_card_ids`**: SSM から取得した `current_id` と `delta_id` より、処理対象の `ocgCardIds`（整数配列）を一意に生成し XCom へ渡す。
+1. **`generate_card_ids`**: SSM から取得した `current_id` と `delta_id` より、処理対象のカード ID 配列（Neuron CID 整数配列）を一意に生成し XCom へ渡す。
 2. **`invoke_lambda_function`**: `cardInfoInsert` Lambda を呼び出し、Neuron DB / YGOPRODeck API からカード基本情報・詳細情報および画像メタデータ（URL）を Neon DB へ INSERT する。
-3. **`invoke_sync_image_lambda`**: インサート直後に `syncStorageImageWithDB` Lambda を呼び出し、同一の `ocgCardIds` を対象として外部 CDN から実体画像を S3 へストリーム保存し、DB の配信 URL（`image_url_*_this_app`）を更新する。
+3. **`invoke_sync_image_lambda`**: インサート直後に `syncStorageImageWithDB` Lambda を呼び出し、同一の Neuron CID 配列（`neuronCardIds`）を対象として外部 CDN から実体画像を S3 へストリーム保存し、DB の配信 URL（`image_url_*_this_app`）を更新する。
 4. **`update_current_id`**: 画像同期まで完了した後に、次回開始 ID（`current_id + delta_id`）を SSM Parameter Store に書き戻す。
 

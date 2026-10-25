@@ -22,10 +22,10 @@ SELECT * FROM card_images
 WHERE card_id = $1
 ORDER BY id;
 
--- name: ListCardImagesByOcgApiCardID :many
+-- name: ListCardImagesByNeuronID :many
 SELECT ci.* FROM card_images ci
-LEFT JOIN cards c ON ci.card_id = c.id
-WHERE ci.ocg_api_card_id = $1 OR c.neuron_id = $1
+JOIN cards c ON ci.card_id = c.id
+WHERE c.neuron_id = $1
 ORDER BY ci.id;
 
 -- name: ListPendingSyncCardImages :many

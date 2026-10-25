@@ -67,13 +67,8 @@ func TestCardImageRepository(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, imagesByCardID, 2)
 
-		// 4. ocg_api_card_id で一覧取得
-		imagesByApiID, err := cardImageRepo.ListCardImagesByOcgApiCardID(ctx, 46986414)
-		assert.NoError(t, err)
-		assert.Len(t, imagesByApiID, 2)
-
-		// 4-2. neuron_id (4005) でも一覧取得できること（Airflow / Neuron CID 連携対応）
-		imagesByNeuronID, err := cardImageRepo.ListCardImagesByOcgApiCardID(ctx, 4005)
+		// 4. neuron_id (4005) で一覧取得（Airflow / Neuron CID 連携）
+		imagesByNeuronID, err := cardImageRepo.ListCardImagesByNeuronID(ctx, 4005)
 		assert.NoError(t, err)
 		assert.Len(t, imagesByNeuronID, 2)
 

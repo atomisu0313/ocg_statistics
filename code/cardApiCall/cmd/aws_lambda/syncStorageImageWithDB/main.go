@@ -21,12 +21,12 @@ func HandleRequest(ctx context.Context, event json.RawMessage) (*dto.SyncImagesO
 		return nil, fmt.Errorf("failed to unmarshal request event: %w", err)
 	}
 
-	if len(input.OcgCardIds) == 0 {
-		return nil, fmt.Errorf("ocgCardIds must not be empty")
+	if len(input.NeuronCardIds) == 0 {
+		return nil, fmt.Errorf("neuronCardIds must not be empty")
 	}
 
 	syncUseCase := do.MustInvoke[syncimage.SyncStorageImageUseCase](globalInjector)
-	output, err := syncUseCase.SyncStorageImagesByCardIDs(ctx, input.OcgCardIds)
+	output, err := syncUseCase.SyncStorageImagesByNeuronIDs(ctx, input.NeuronCardIds)
 	if err != nil {
 		return nil, err
 	}

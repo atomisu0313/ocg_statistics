@@ -166,21 +166,21 @@ docker compose up -d minio minio_create_buckets cardapicall_syncstorageimage
 ```
 
 ### 4.2 ローカル結合テスト実行
-[`scripts/code/cardApiCall/syncstorageimage/local_test.sh`](../../scripts/code/cardApiCall/syncstorageimage/local_test.sh) を使用してカード ID を送信します：
+[`scripts/code/cardApiCall/syncstorageimage/local_test.sh`](../../scripts/code/cardApiCall/syncstorageimage/local_test.sh) を使用してカードの Neuron CID を送信します：
 
 ```bash
-# カード ID 89631139（青眼の白龍）の画像同期をテスト
-bash scripts/code/cardApiCall/syncstorageimage/local_test.sh "[89631139]"
+# カード Neuron CID 4005（ブラック・マジシャン）の画像同期をテスト
+bash scripts/code/cardApiCall/syncstorageimage/local_test.sh "[4005]"
 ```
 
 **実行結果（初回実行時: 新規アップロード）**:
 ```json
-{"totalProcessedCards":1,"successfulOcgCardIds":[89631139],"failedOcgCardIds":[],"syncedImageCount":24,"skippedImageCount":0,"errors":[]}
+{"totalProcessedCards":1,"successfulNeuronCardIds":[4005],"failedNeuronCardIds":[],"syncedImageCount":3,"skippedImageCount":0,"errors":[]}
 ```
 
 **実行結果（2回目実行時: 冪等性・スキップ動作）**:
 ```json
-{"totalProcessedCards":1,"successfulOcgCardIds":[89631139],"failedOcgCardIds":[],"syncedImageCount":0,"skippedImageCount":24,"errors":[]}
+{"totalProcessedCards":1,"successfulNeuronCardIds":[4005],"failedNeuronCardIds":[],"syncedImageCount":0,"skippedImageCount":3,"errors":[]}
 ```
 
 ### 4.3 MinIO および DB の確認

@@ -13,7 +13,7 @@ type CardImageRepository interface {
 	Repository
 	InsertCardImage(ctx context.Context, arg sqlc_gen.InsertCardImageParams) (sqlc_gen.CardImage, error)
 	ListCardImagesByCardID(ctx context.Context, cardID int64) ([]sqlc_gen.CardImage, error)
-	ListCardImagesByOcgApiCardID(ctx context.Context, ocgApiCardID int64) ([]sqlc_gen.CardImage, error)
+	ListCardImagesByNeuronID(ctx context.Context, neuronID int64) ([]sqlc_gen.CardImage, error)
 	ListPendingSyncCardImages(ctx context.Context, limit int32) ([]sqlc_gen.CardImage, error)
 	UpdateCardImageThisAppUrls(ctx context.Context, arg sqlc_gen.UpdateCardImageThisAppUrlsParams) (sqlc_gen.CardImage, error)
 	DeleteCardImagesByCardID(ctx context.Context, cardID int64) error
@@ -62,17 +62,17 @@ func (r *cardImageRepositoryImpl) ListCardImagesByCardID(ctx context.Context, ca
 	return cardImages, nil
 }
 
-func (r *cardImageRepositoryImpl) ListCardImagesByOcgApiCardID(ctx context.Context, ocgApiCardID int64) ([]sqlc_gen.CardImage, error) {
+func (r *cardImageRepositoryImpl) ListCardImagesByNeuronID(ctx context.Context, neuronID int64) ([]sqlc_gen.CardImage, error) {
 	start := time.Now()
-	defer r.logDBOperation("ListCardImagesByOcgApiCardID", start, zap.Int64("ocg_api_card_id", ocgApiCardID))
+	defer r.logDBOperation("ListCardImagesByNeuronID", start, zap.Int64("neuron_id", neuronID))
 
-	cardImages, err := r.queries.ListCardImagesByOcgApiCardID(ctx, ocgApiCardID)
+	cardImages, err := r.queries.ListCardImagesByNeuronID(ctx, sql.NullInt64{Int64: neuronID, Valid: true})
 	if err != nil {
-		r.logDBError("ListCardImagesByOcgApiCardID", err, zap.Int64("ocg_api_card_id", ocgApiCardID))
+		r.logDBError("ListCardImagesByNeuronID", err, zap.Int64("neuron_id", neuronID))
 		return nil, err
 	}
 
-	r.logDBResult("ListCardImagesByOcgApiCardID", cardImages, zap.Int64("ocg_api_card_id", ocgApiCardID))
+	r.logDBResult("ListCardImagesByNeuronID", cardImages, zap.Int64("neuron_id", neuronID))
 	return cardImages, nil
 }
 

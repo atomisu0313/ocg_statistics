@@ -18,7 +18,8 @@ import (
 
 // SyncStorageImageUseCase はカード画像の外部ストレージ同期ユースケースのインターフェースです。
 type SyncStorageImageUseCase interface {
-	SyncStorageImagesByCardIDs(ctx context.Context, ocgCardIds []int64) (*dto.SyncImagesOutput, error)
+	SyncStorageImagesByNeuronIDs(ctx context.Context, neuronCardIds []int64) (*dto.SyncImagesOutput, error)
+	SyncStorageImagesByCardIDs(ctx context.Context, neuronCardIds []int64) (*dto.SyncImagesOutput, error)
 	SyncStorageImages(ctx context.Context, startId int64, delta int64) ([]int64, error)
 }
 
@@ -74,37 +75,42 @@ func NewSyncStorageImageUseCaseForDI(i *do.Injector) (SyncStorageImageUseCase, e
 	return NewSyncStorageImageUseCase(dbConn, cardImageRepo, storageClient, streamClient), nil
 }
 
-// SyncStorageImagesByCardIDs は対象 OCG_ID のリストを受け取り、画像の突合、S3ストリーミング同期、DB更新を行います。
-func (u *syncStorageImageUseCaseImpl) SyncStorageImagesByCardIDs(ctx context.Context, ocgCardIds []int64) (*dto.SyncImagesOutput, error) {
-	if len(ocgCardIds) == 0 {
-		return nil, fmt.Errorf("ocgCardIds must not be empty")
+// SyncStorageImagesByCardIDs は SyncStorageImagesByNeuronIDs へのエイリアスです。
+func (u *syncStorageImageUseCaseImpl) SyncStorageImagesByCardIDs(ctx context.Context, neuronCardIds []int64) (*dto.SyncImagesOutput, error) {
+	return u.SyncStorageImagesByNeuronIDs(ctx, neuronCardIds)
+}
+
+// SyncStorageImagesByNeuronIDs は対象 Neuron CID のリストを受け取り、画像の突合、S3ストリーミング同期、DB更新を行います。
+func (u *syncStorageImageUseCaseImpl) SyncStorageImagesByNeuronIDs(ctx context.Context, neuronCardIds []int64) (*dto.SyncImagesOutput, error) {
+	if len(neuronCardIds) == 0 {
+		return nil, fmt.Errorf("neuronCardIds must not be empty")
 	}
 
 	output := &dto.SyncImagesOutput{
-		TotalProcessedCards:  len(ocgCardIds),
-		SuccessfulOcgCardIds: make([]int64, 0),
-		FailedOcgCardIds:     make([]int64, 0),
-		SyncedImageCount:     0,
-		SkippedImageCount:    0,
-		Errors:               make([]dto.SyncError, 0),
+		TotalProcessedCards:     len(neuronCardIds),
+		SuccessfulNeuronCardIds: make([]int64, 0),
+		FailedNeuronCardIds:     make([]int64, 0),
+		SyncedImageCount:        0,
+		SkippedImageCount:       0,
+		Errors:                  make([]dto.SyncError, 0),
 	}
 
-	for _, ocgCardId := range ocgCardIds {
-		records, err := u.cardImageRepo.ListCardImagesByOcgApiCardID(ctx, ocgCardId)
+	for _, neuronCardId := range neuronCardIds {
+		records, err := u.cardImageRepo.ListCardImagesByNeuronID(ctx, neuronCardId)
 		if err != nil {
-			output.FailedOcgCardIds = append(output.FailedOcgCardIds, ocgCardId)
+			output.FailedNeuronCardIds = append(output.FailedNeuronCardIds, neuronCardId)
 			output.Errors = append(output.Errors, dto.SyncError{
-				OcgCardId: ocgCardId,
-				Message:   fmt.Sprintf("failed to list card images: %v", err),
+				NeuronCardID: neuronCardId,
+				Message:      fmt.Sprintf("failed to list card images: %v", err),
 			})
 			continue
 		}
 
 		if len(records) == 0 {
-			output.FailedOcgCardIds = append(output.FailedOcgCardIds, ocgCardId)
+			output.FailedNeuronCardIds = append(output.FailedNeuronCardIds, neuronCardId)
 			output.Errors = append(output.Errors, dto.SyncError{
-				OcgCardId: ocgCardId,
-				Message:   "card images not found in database",
+				NeuronCardID: neuronCardId,
+				Message:      "card images not found in database",
 			})
 			continue
 		}
@@ -155,8 +161,8 @@ func (u *syncStorageImageUseCaseImpl) SyncStorageImagesByCardIDs(ctx context.Con
 				exists, err := u.storageClient.ObjectExists(ctx, v.s3Key)
 				if err != nil {
 					cardErrors = append(cardErrors, dto.SyncError{
-						OcgCardId:     ocgCardId,
-						OcgApiImageId: record.OcgApiImageID,
+						NeuronCardID:  neuronCardId,
+						OcgApiImageID: record.OcgApiImageID,
 						Message:       fmt.Sprintf("failed to check existence for %s: %v", v.s3Key, err),
 					})
 					continue
@@ -171,7 +177,7 @@ func (u *syncStorageImageUseCaseImpl) SyncStorageImagesByCardIDs(ctx context.Con
 				} else {
 					task := dto.ImageSyncTaskDTO{
 						CardImageID:    record.ID,
-						OcgApiCardID:   ocgCardId,
+						NeuronID:       neuronCardId,
 						OcgApiImageID:  record.OcgApiImageID,
 						Variant:        v.variant,
 						SourceURL:      v.sourceURL,
@@ -200,7 +206,7 @@ func (u *syncStorageImageUseCaseImpl) SyncStorageImagesByCardIDs(ctx context.Con
 		}
 
 		if len(cardErrors) > 0 {
-			output.FailedOcgCardIds = append(output.FailedOcgCardIds, ocgCardId)
+			output.FailedNeuronCardIds = append(output.FailedNeuronCardIds, neuronCardId)
 			output.Errors = append(output.Errors, cardErrors...)
 			continue
 		}
@@ -223,8 +229,8 @@ func (u *syncStorageImageUseCaseImpl) SyncStorageImagesByCardIDs(ctx context.Con
 					if err != nil {
 						mu.Lock()
 						cardErrors = append(cardErrors, dto.SyncError{
-							OcgCardId:     task.OcgApiCardID,
-							OcgApiImageId: task.OcgApiImageID,
+							NeuronCardID:  task.NeuronID,
+							OcgApiImageID: task.OcgApiImageID,
 							Message:       fmt.Sprintf("failed to get stream from %s: %v", task.SourceURL, err),
 						})
 						mu.Unlock()
@@ -236,8 +242,8 @@ func (u *syncStorageImageUseCaseImpl) SyncStorageImagesByCardIDs(ctx context.Con
 					if err != nil {
 						mu.Lock()
 						cardErrors = append(cardErrors, dto.SyncError{
-							OcgCardId:     task.OcgApiCardID,
-							OcgApiImageId: task.OcgApiImageID,
+							NeuronCardID:  task.NeuronID,
+							OcgApiImageID: task.OcgApiImageID,
 							Message:       fmt.Sprintf("failed to stream image to S3: %v", err),
 						})
 						mu.Unlock()
@@ -253,7 +259,7 @@ func (u *syncStorageImageUseCaseImpl) SyncStorageImagesByCardIDs(ctx context.Con
 		}
 
 		if len(cardErrors) > 0 {
-			output.FailedOcgCardIds = append(output.FailedOcgCardIds, ocgCardId)
+			output.FailedNeuronCardIds = append(output.FailedNeuronCardIds, neuronCardId)
 			output.Errors = append(output.Errors, cardErrors...)
 			continue
 		}
@@ -291,15 +297,15 @@ func (u *syncStorageImageUseCaseImpl) SyncStorageImagesByCardIDs(ctx context.Con
 		}
 
 		if updateErr != nil {
-			output.FailedOcgCardIds = append(output.FailedOcgCardIds, ocgCardId)
+			output.FailedNeuronCardIds = append(output.FailedNeuronCardIds, neuronCardId)
 			output.Errors = append(output.Errors, dto.SyncError{
-				OcgCardId: ocgCardId,
-				Message:   fmt.Sprintf("failed to update card images in database: %v", updateErr),
+				NeuronCardID: neuronCardId,
+				Message:      fmt.Sprintf("failed to update card images in database: %v", updateErr),
 			})
 			continue
 		}
 
-		output.SuccessfulOcgCardIds = append(output.SuccessfulOcgCardIds, ocgCardId)
+		output.SuccessfulNeuronCardIds = append(output.SuccessfulNeuronCardIds, neuronCardId)
 		output.SyncedImageCount += cardSyncedCount
 		output.SkippedImageCount += cardSkippedCount
 	}
@@ -313,9 +319,10 @@ func (u *syncStorageImageUseCaseImpl) SyncStorageImages(ctx context.Context, sta
 	for i := int64(0); i < delta; i++ {
 		ids = append(ids, startId+i)
 	}
-	out, err := u.SyncStorageImagesByCardIDs(ctx, ids)
+	out, err := u.SyncStorageImagesByNeuronIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
-	return out.FailedOcgCardIds, nil
+	return out.FailedNeuronCardIds, nil
 }
+

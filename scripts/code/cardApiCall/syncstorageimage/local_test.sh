@@ -1,10 +1,10 @@
 #!/bin/bash
 set -Ceu
 
-cardIds=${1:-"[89631139, 46986414]"}
+neuronCardIds=${1:-"[4000, 4001]"}
 
-echo "Invoking syncStorageImage on port 9003 (ocgCardIds: ${cardIds})..."
+echo "Invoking syncStorageImage on port 9003 (neuronCardIds: ${neuronCardIds})..."
 curl -s -X POST "http://localhost:9003/2015-03-31/functions/function/invocations" \
   -H "Content-Type: application/json" \
-  -d "{\"ocgCardIds\": ${cardIds}}"
+  -d "{\"neuronCardIds\": ${neuronCardIds}}"
 echo ""

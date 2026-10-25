@@ -160,7 +160,7 @@ with DAG(
         region_name='ap-northeast-1',
         function_name=os.environ.get('OCG_SYNC_IMAGE_LAMBDA_FUNCTION_NAME', 'ocg-syncstorageimage'),
         payload='''{
-            "ocgCardIds": {{ task_instance.xcom_pull(task_ids='generate_card_ids') | tojson }}
+            "neuronCardIds": {{ task_instance.xcom_pull(task_ids='generate_card_ids') | tojson }}
         }''',
     )
     

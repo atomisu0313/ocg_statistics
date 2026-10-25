@@ -17,7 +17,7 @@ flowchart TD
     end
 
     subgraph ImageSync["2. 実体画像同期 (syncStorageImageWithDB)"]
-        Airflow["Airflow DAG<br>(db_insert.py)"] -->|"Invoke {ocgCardIds}"| LambdaSync["syncStorageImageWithDB (Lambda)"]
+        Airflow["Airflow DAG<br>(db_insert.py)"] -->|"Invoke {neuronCardIds}"| LambdaSync["syncStorageImageWithDB (Lambda)"]
         LambdaSync -->|"未同期レコード取得"| ImagesTable
         LambdaSync -->|"HTTP GET"| ExtCDN["YGOPRODeck CDN"]
         LambdaSync -->|"PUT Object"| S3[("AWS S3 バケット<br>ocg-statistics-card-images")]
@@ -206,7 +206,7 @@ invoke_sync_image_lambda_task = LambdaInvokeFunctionOperator(
     region_name='ap-northeast-1',
     function_name=os.environ.get('OCG_SYNC_IMAGE_LAMBDA_FUNCTION_NAME', 'ocg-syncstorageimage'),
     payload='''{
-        "ocgCardIds": {{ task_instance.xcom_pull(task_ids='generate_card_ids') | tojson }}
+        "neuronCardIds": {{ task_instance.xcom_pull(task_ids='generate_card_ids') | tojson }}
     }''',
 )
 
