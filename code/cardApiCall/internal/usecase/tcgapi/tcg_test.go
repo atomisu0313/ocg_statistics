@@ -62,4 +62,25 @@ func TestTcgUseCase(t *testing.T) {
 		assert.Equal(t, expected["name"], results.Name)
 		assert.Equal(t, expected["desc"], results.Desc)
 	})
+
+	t.Run("カード情報の取得テスト(ドロール＆ロックバード)_特殊文字(&)が入る場合", func(t *testing.T) {
+		injector := app.SetupDIContainer()
+		do.Override(injector, config.TestDbConnection)
+
+		expected := map[string]string{
+			"id":   "94145021",
+			"name": "Droll & Lock Bird",
+			"desc": "If a card(s) is added from the Main Deck to your opponent's hand, except during the Draw Phase (Quick Effect): You can send this card from your hand to the GY; for the rest of this turn, cards cannot be added from either player's Main Deck to the hand.",
+		}
+
+		tcgUseCase := do.MustInvoke[tcgapi.TcgUseCase](injector)
+
+		results, err := tcgUseCase.GetCardInfoByEnName(context.Background(), "Droll & Lock Bird")
+		assert.NoError(t, err)
+		assert.NotNil(t, results)
+		assert.Equal(t, expected["id"], strconv.FormatInt(results.ID, 10))
+		assert.Equal(t, expected["name"], results.Name)
+		assert.Equal(t, expected["desc"], results.Desc)
+	})
 }
+

@@ -112,6 +112,21 @@ func TestInsertCardInfo(t *testing.T) {
 		},
 		{
 			card: cardrecord.StandardCard{
+				NameEn:    "Droll & Lock Bird",
+				NameJa:    "ドロール＆ロックバード",
+				NeuronID:  9279,
+				TcgID:     94145021,
+				Def:       0,
+				Atk:       0,
+				Type:      "Effect Monster",
+				Level:     1,
+				Race:      "Spellcaster",
+				Attribute: "WIND",
+				TypeLines: []string{"Effect"},
+			},
+		},
+		{
+			card: cardrecord.StandardCard{
 				NameEn:    "Fortune Chariot",
 				NameJa:    "運命の戦車",
 				NeuronID:  13996,
@@ -693,6 +708,12 @@ func TestInsertCardInfoListByOcgCardIds(t *testing.T) {
 		failed, err := masterUseCase.InsertCardInfoListByOcgCardIds(context.Background(), []int64{1, 2})
 		assert.NoError(t, err)
 		assert.ElementsMatch(t, []int64{1, 2}, failed)
+	})
+
+	t.Run("特殊文字(&)を含むカードID(9279: ドロール＆ロックバード)が正常にDB登録されfailedIdsに含まれない", func(t *testing.T) {
+		failed, err := masterUseCase.InsertCardInfoListByOcgCardIds(context.Background(), []int64{9279})
+		assert.NoError(t, err)
+		assert.Empty(t, failed)
 	})
 }
 

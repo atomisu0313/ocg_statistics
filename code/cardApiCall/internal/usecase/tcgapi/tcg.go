@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strings"
 
 	"atomisu.com/ocg-statics/cardApiCall/internal/dto/cardrecord"
 	"atomisu.com/ocg-statics/cardApiCall/internal/http"
@@ -34,14 +33,8 @@ func NewTcgUseCase(i *do.Injector) (TcgUseCase, error) {
 	})
 }
 
-var OmitChars = []string{"＃", "#", "<", ">", "&"}
-
 func (t *tcgUseCaseImpl) GetCardInfoByEnName(ctx context.Context, name string) (cardrecord.TcgApiCard, error) {
 	tcgRest := http.NewTCGRest()
-
-	for _, omitChar := range OmitChars {
-		name = strings.ReplaceAll(name, omitChar, "")
-	}
 
 	results, err := tcgRest.GetEnInfoByEnName(ctx, name)
 	if err != nil {
