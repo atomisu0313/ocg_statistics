@@ -1,11 +1,10 @@
 #!/bin/bash
 set -Ceu
 
-startId=${1:-100}
-delta=${2:-10}
+cardIds=${1:-"[100, 101, 102]"}
 
-echo "Invoking cardInfoInsert on port 9002 (startId: ${startId}, delta: ${delta})..."
+echo "Invoking cardInfoInsert on port 9002 (ocgCardIds: ${cardIds})..."
 curl -s -X POST "http://localhost:9002/2015-03-31/functions/function/invocations" \
   -H "Content-Type: application/json" \
-  -d "{\"startId\": ${startId}, \"delta\": ${delta}}"
+  -d "{\"ocgCardIds\": ${cardIds}}"
 echo ""

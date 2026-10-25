@@ -15,7 +15,8 @@ go test \
   ./internal/usecase/neuron/... \
   ./internal/usecase/tcgapi/... \
   ./internal/usecase/syncimage/... \
-  ./cmd/aws_lambda/syncStorageImageWithDB/...
+  ./cmd/aws_lambda/syncStorageImageWithDB/... \
+  ./cmd/aws_lambda/cardInfoInsert/...
 
 echo ""
 echo "=================================================="

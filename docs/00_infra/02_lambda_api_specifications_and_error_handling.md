@@ -45,7 +45,7 @@ curl -s -X POST "http://localhost:9001/2015-03-31/functions/function/invocations
 # 2. cardInfoInsert (ポート 9002)
 curl -s -X POST "http://localhost:9002/2015-03-31/functions/function/invocations" \
   -H "Content-Type: application/json" \
-  -d '{"startId": 10000, "delta": 10}'
+  -d '{"ocgCardIds": [10000, 10001, 10002]}'
 
 # 3. syncStorageImageWithDB (ポート 9003)
 curl -s -X POST "http://localhost:9003/2015-03-31/functions/function/invocations" \

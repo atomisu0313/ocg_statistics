@@ -675,3 +675,24 @@ func TestInsertCardInfoListMixed(t *testing.T) {
 		})
 	}
 }
+
+func TestInsertCardInfoListByOcgCardIds(t *testing.T) {
+	config.BeforeEachForUnitTest()
+	defer config.AfterEachForUnitTest()
+	injector := app.SetupDIContainer()
+	do.Override(injector, config.TestDbConnection)
+	masterUseCase := do.MustInvoke[master.MasterUseCase](injector)
+
+	t.Run("空のスライスを渡した場合は即座に空結果を返す", func(t *testing.T) {
+		failed, err := masterUseCase.InsertCardInfoListByOcgCardIds(context.Background(), []int64{})
+		assert.NoError(t, err)
+		assert.Empty(t, failed)
+	})
+
+	t.Run("指定カードIDリストで処理が実行され失敗IDが返却される", func(t *testing.T) {
+		failed, err := masterUseCase.InsertCardInfoListByOcgCardIds(context.Background(), []int64{1, 2})
+		assert.NoError(t, err)
+		assert.ElementsMatch(t, []int64{1, 2}, failed)
+	})
+}
+

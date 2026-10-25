@@ -13,8 +13,8 @@
 **入出力**（[main.go](../../code/cardApiCall/infoInsert/main.go)）
 
 ```json
-// Input                      // Output
-{ "startId": 100, "delta": 10 }  { "failedIds": [103, 107] }
+// Input                                   // Output
+{ "ocgCardIds": [100, 101, 102] }          { "failedIds": [101] }
 ```
 
 ### 主要ライブラリ
@@ -91,7 +91,7 @@ sequenceDiagram
     participant D as NeonUseCase
     participant DB as PostgreSQL
 
-    L->>M: InsertCardInfoList(startId, delta)
+    L->>M: InsertCardInfoListByOcgCardIds(ocgCardIds)
     loop ワーカー最大10並列 / ID毎
         M->>N: GetCardInfo(id) 公式DBスクレイピング
         N-->>M: 英名・日本語名・日本語テキスト
