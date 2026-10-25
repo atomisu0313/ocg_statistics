@@ -36,6 +36,7 @@
 | **[05_sync_images/](./05_sync_images/README.md)** | カード画像 S3 同期 | [S3 画像同期 API 仕様書 (01_sync_storage_images_api_specification.md)](./05_sync_images/01_sync_storage_images_api_specification.md)、[インフラ準備・要件定義書 (02_infrastructure_and_prerequisites_guide.md)](./05_sync_images/02_infrastructure_and_prerequisites_guide.md) |
 | **[06_scripts_general/](./06_scripts_general/README.md)** | スクリプト総合設計 | [スクリプト体系設計書およびテスト実行スクリプト標準規約 (01_script_architecture_and_design_policy.md)](./06_scripts_general/01_script_architecture_and_design_policy.md) |
 | **[07_development/](./07_development/README.md)** | 開発標準プロセス | [Issue 駆動開発標準ワークフロー (01_issue_driven_development_workflow.md)](./07_development/01_issue_driven_development_workflow.md) |
+| **[08_external_apis/](./08_external_apis/README.md)** | 外部 API 連携・ナレッジ | [外部 API 連携におけるクエリエンコードと文字サニタイズの責務分離 (01_ygoprodeck_api_query_encoding_and_character_sanitization.md)](./08_external_apis/01_ygoprodeck_api_query_encoding_and_character_sanitization.md) |
 | **[X_important/](./X_important/README.md)** | 重要遵守ルール | 開発者が遵守すべき共通・Lambda・インフラの厳格ルール集 |
 
 ---
