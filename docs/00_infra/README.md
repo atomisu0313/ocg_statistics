@@ -56,5 +56,7 @@ ocg_statistics/
 
 - [01_local_infrastructure_docker_compose.md](./01_local_infrastructure_docker_compose.md): **ローカルインフラ検証環境 (Docker Compose) とポート一覧**
 - [02_lambda_api_specifications_and_error_handling.md](./02_lambda_api_specifications_and_error_handling.md): **AWS Lambda API 仕様・参照インデックス** (code/api/lambda_specs.yaml へのポインタ・インフラ一覧)
+- [04_lambda_and_airflow_logging_investigation_guide.md](./04_lambda_and_airflow_logging_investigation_guide.md): **AWS Lambda と Airflow パイプライン連携におけるログ調査手法と IAM 落とし穴** (Airflow タスクログ、CloudWatch Logs 権限不備、aws lambda invoke 検証)
 - [インフラ運用ルール索引](../X_important/infra/rules/README.md)
 - [スクリプト外デプロイ禁止ルール](../X_important/infra/rules/01_script_only_infra_deployment_rules.md)
+

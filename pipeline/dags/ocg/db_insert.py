@@ -102,6 +102,23 @@ def _generate_card_ids(current_id_str: str, delta_id_str: str) -> list[int]:
         print(f"Error generating card IDs: {e}")
         raise
 
+@task(task_id="divide_sync_image_payloads")
+def _divide_sync_image_payloads(card_ids: list[int], chunk_size: int = 20) -> list[str]:
+    """
+    card_ids を chunk_size 件ごとに分割し、画像同期 Lambda 呼び出し用 payload (JSON 文字列) のリストを生成する。
+    """
+    if not card_ids:
+        print("Card IDs list is empty. Returning empty payloads.")
+        return []
+
+    payloads = []
+    for i in range(0, len(card_ids), chunk_size):
+        chunk = card_ids[i:i + chunk_size]
+        payloads.append(json.dumps({"neuronCardIds": chunk}))
+
+    print(f"Generated {len(payloads)} sync image payload chunk(s) (chunk_size={chunk_size})")
+    return payloads
+
 @task(task_id="alarm_excess_id")
 def _alarm_excess_id():
     print("Alarm excess id")
@@ -141,6 +158,7 @@ with DAG(
     get_delta_id_task = _get_delta_id_from_store()
     
     generate_card_ids_task = _generate_card_ids(get_current_id_task, get_delta_id_task)
+    divide_sync_image_payloads_task = _divide_sync_image_payloads(generate_card_ids_task)
 
     choose_branch_path = _choose_branch_path(get_current_id_task, get_delta_id_task, get_max_id_task)
     alarm_excess_id_task = _alarm_excess_id()
@@ -155,14 +173,12 @@ with DAG(
         }''',
     )
 
-    invoke_sync_image_lambda_task = LambdaInvokeFunctionOperator(
+    invoke_sync_image_lambda_task = LambdaInvokeFunctionOperator.partial(
         task_id="invoke_sync_image_lambda",
         region_name='ap-northeast-1',
         function_name=os.environ.get('OCG_SYNC_IMAGE_LAMBDA_FUNCTION_NAME', 'ocg-syncstorageimage'),
-        payload='''{
-            "neuronCardIds": {{ task_instance.xcom_pull(task_ids='generate_card_ids') | tojson }}
-        }''',
-    )
+        max_active_tis_per_dag=2,
+    ).expand(payload=divide_sync_image_payloads_task)
     
     update_id_task = _update_current_id(get_current_id_task, get_delta_id_task)
     
@@ -170,6 +186,7 @@ with DAG(
 
     start >> start_fetch_param >> [get_current_id_task, get_max_id_task, get_delta_id_task]
     [get_current_id_task, get_delta_id_task] >> generate_card_ids_task
+    generate_card_ids_task >> divide_sync_image_payloads_task
     choose_branch_path >> [invoke_lambda_function_task, alarm_excess_id_task]
     generate_card_ids_task >> invoke_lambda_function_task
     invoke_lambda_function_task >> invoke_sync_image_lambda_task >> update_id_task
