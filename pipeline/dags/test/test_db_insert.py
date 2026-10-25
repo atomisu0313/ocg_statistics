@@ -7,7 +7,13 @@ from airflow.models.dag import DAG
 from airflow.decorators import task
 
 # The tasks to be tested
-from ocg.db_insert import _choose_branch_path, _update_current_id, _generate_card_ids, dag as ocg_dag
+from ocg.db_insert import (
+    _choose_branch_path,
+    _update_current_id,
+    _generate_card_ids,
+    _divide_sync_image_payloads,
+    dag as ocg_dag,
+)
 
 @pytest.fixture
 def dag_factory():
@@ -27,21 +33,24 @@ def test_choose_branch_path_invoke_lambda(dag_factory):
     """Tests that the 'invoke_lambda_function' branch is chosen correctly."""
     dag = dag_factory("test_branch_invoke")
 
-    # 1. Dummy upstream tasks to provide XComs
+    # 1. Dummy upstream tasks to provide return values
     @task(task_id="get_current_id_from_store", dag=dag)
-    def dummy_get_current_id(**context):
-        context["task_instance"].xcom_push(key="current_id", value="100")
+    def dummy_get_current_id():
+        return "100"
 
     @task(task_id="get_delta_id_from_store", dag=dag)
-    def dummy_get_delta_id(**context):
-        context["task_instance"].xcom_push(key="delta_id", value="10")
+    def dummy_get_delta_id():
+        return "10"
 
     @task(task_id="get_max_id_from_store", dag=dag)
-    def dummy_get_max_id(**context):
-        context["task_instance"].xcom_push(key="max_id", value="200")
+    def dummy_get_max_id():
+        return "200"
 
     # 2. The task to test
-    xcom_arg = _choose_branch_path(dag=dag)
+    c_id = dummy_get_current_id()
+    d_id = dummy_get_delta_id()
+    m_id = dummy_get_max_id()
+    xcom_arg = _choose_branch_path(c_id, d_id, m_id)
     task_to_test = xcom_arg.operator
 
     # 3. Dummy downstream tasks for the branch operator to find
@@ -54,7 +63,6 @@ def test_choose_branch_path_invoke_lambda(dag_factory):
         pass
 
     # 4. Set all dependencies
-    [dummy_get_current_id().operator, dummy_get_delta_id().operator, dummy_get_max_id().operator] >> task_to_test
     task_to_test >> [dummy_invoke_lambda().operator, dummy_alarm_excess().operator]
 
     # 5. Run the test
@@ -73,18 +81,21 @@ def test_choose_branch_path_alarm_excess_id(dag_factory):
     dag = dag_factory("test_branch_alarm")
 
     @task(task_id="get_current_id_from_store", dag=dag)
-    def dummy_get_current_id(**context):
-        context["task_instance"].xcom_push(key="current_id", value="195")
+    def dummy_get_current_id():
+        return "195"
 
     @task(task_id="get_delta_id_from_store", dag=dag)
-    def dummy_get_delta_id(**context):
-        context["task_instance"].xcom_push(key="delta_id", value="10")
+    def dummy_get_delta_id():
+        return "10"
 
     @task(task_id="get_max_id_from_store", dag=dag)
-    def dummy_get_max_id(**context):
-        context["task_instance"].xcom_push(key="max_id", value="200")
+    def dummy_get_max_id():
+        return "200"
 
-    xcom_arg = _choose_branch_path(dag=dag)
+    c_id = dummy_get_current_id()
+    d_id = dummy_get_delta_id()
+    m_id = dummy_get_max_id()
+    xcom_arg = _choose_branch_path(c_id, d_id, m_id)
     task_to_test = xcom_arg.operator
 
     @task(task_id="invoke_lambda_function", dag=dag)
@@ -95,7 +106,6 @@ def test_choose_branch_path_alarm_excess_id(dag_factory):
     def dummy_alarm_excess():
         pass
 
-    [dummy_get_current_id().operator, dummy_get_delta_id().operator, dummy_get_max_id().operator] >> task_to_test
     task_to_test >> [dummy_invoke_lambda().operator, dummy_alarm_excess().operator]
 
     dag.test()
@@ -107,7 +117,7 @@ def test_choose_branch_path_alarm_excess_id(dag_factory):
     assert ti_invoke.state == "skipped"
     assert ti_alarm.state == "success"
 
-# --- Tests for _update_current_id (passing tests are left as is) ---
+# --- Tests for _update_current_id ---
 
 @patch('boto3.client')
 def test_update_current_id_success(mock_boto3_client, dag_factory):
@@ -116,17 +126,16 @@ def test_update_current_id_success(mock_boto3_client, dag_factory):
     dag = dag_factory("test_update_success")
     
     @task(task_id="get_current_id_from_store", dag=dag)
-    def dummy_get_current_id(**context):
-        context["task_instance"].xcom_push(key="current_id", value="100")
+    def dummy_get_current_id():
+        return "100"
 
     @task(task_id="get_delta_id_from_store", dag=dag)
-    def dummy_get_delta_id(**context):
-        context["task_instance"].xcom_push(key="delta_id", value="10")
+    def dummy_get_delta_id():
+        return "10"
 
-    xcom_arg = _update_current_id(dag=dag)
-    task_to_test = xcom_arg.operator
-    
-    [dummy_get_current_id().operator, dummy_get_delta_id().operator] >> task_to_test
+    c_id = dummy_get_current_id()
+    d_id = dummy_get_delta_id()
+    _update_current_id(c_id, d_id)
 
     with patch.dict('os.environ', {'OCG_CURRENT_ID_SSM_PATH': 'test_path'}):
         dag.test()
@@ -145,17 +154,16 @@ def test_update_current_id_no_delta_id(mock_boto3_client, dag_factory):
     dag = dag_factory("test_update_no_delta")
 
     @task(task_id="get_current_id_from_store", dag=dag)
-    def dummy_get_current_id(**context):
-        context["task_instance"].xcom_push(key="current_id", value="100")
+    def dummy_get_current_id():
+        return "100"
 
     @task(task_id="get_delta_id_from_store", dag=dag)
-    def dummy_get_delta_id(**context):
-        context["task_instance"].xcom_push(key="delta_id", value=None)
+    def dummy_get_delta_id():
+        return None
 
-    xcom_arg = _update_current_id(dag=dag)
-    task_to_test = xcom_arg.operator
-
-    [dummy_get_current_id().operator, dummy_get_delta_id().operator] >> task_to_test
+    c_id = dummy_get_current_id()
+    d_id = dummy_get_delta_id()
+    _update_current_id(c_id, d_id)
 
     with patch.dict('os.environ', {'OCG_CURRENT_ID_SSM_PATH': 'test_path'}):
         dag.test()
@@ -171,7 +179,6 @@ def test_update_current_id_no_delta_id(mock_boto3_client, dag_factory):
 
 def test_generate_card_ids_success():
     """Tests that _generate_card_ids produces expected consecutive ID list."""
-    # Calling the underlying python function wrapped by @task
     result = _generate_card_ids.function("100", "5")
     assert result == [100, 101, 102, 103, 104]
 
@@ -184,6 +191,21 @@ def test_generate_card_ids_invalid():
     """Tests that _generate_card_ids raises ValueError for non-numeric input."""
     with pytest.raises(ValueError):
         _generate_card_ids.function("abc", "5")
+
+# --- Tests for _divide_sync_image_payloads ---
+
+def test_divide_sync_image_payloads_success():
+    """Tests chunking of card IDs into JSON payloads for sync_image lambda."""
+    card_ids = list(range(100, 150))  # 50 cards
+    payloads = _divide_sync_image_payloads.function(card_ids, chunk_size=20)
+    assert len(payloads) == 3
+    assert payloads[0] == '{"neuronCardIds": [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119]}'
+    assert payloads[1] == '{"neuronCardIds": [120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139]}'
+    assert payloads[2] == '{"neuronCardIds": [140, 141, 142, 143, 144, 145, 146, 147, 148, 149]}'
+
+def test_divide_sync_image_payloads_empty():
+    """Tests that empty card IDs list returns empty payloads list."""
+    assert _divide_sync_image_payloads.function([]) == []
 
 # --- Tests for DAG structure and dependencies ---
 
@@ -200,6 +222,7 @@ def test_dag_structure_and_dependencies():
         "get_max_id_from_store",
         "get_delta_id_from_store",
         "generate_card_ids",
+        "divide_sync_image_payloads",
         "choose_branch_path",
         "alarm_excess_id",
         "invoke_lambda_function",
