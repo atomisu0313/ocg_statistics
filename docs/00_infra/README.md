@@ -55,5 +55,6 @@ ocg_statistics/
 ## 4. ドキュメント一覧
 
 - [01_local_infrastructure_docker_compose.md](./01_local_infrastructure_docker_compose.md): **ローカルインフラ検証環境 (Docker Compose) とポート一覧**
+- [02_lambda_api_specifications_and_error_handling.md](./02_lambda_api_specifications_and_error_handling.md): **AWS Lambda API 仕様・参照インデックス** (code/api/lambda_specs.yaml へのポインタ・インフラ一覧)
 - [インフラ運用ルール索引](../X_important/infra/rules/README.md)
 - [スクリプト外デプロイ禁止ルール](../X_important/infra/rules/01_script_only_infra_deployment_rules.md)

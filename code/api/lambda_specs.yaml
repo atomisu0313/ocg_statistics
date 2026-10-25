@@ -1,0 +1,412 @@
+openapi: 3.1.0
+info:
+  title: OCG Statistics Lambda Function APIs
+  version: 1.0.0
+  description: |
+    # 遊戯王カード統計基盤 AWS Lambda API 仕様書
+
+    本仕様書は、`ocg_statistics` プロジェクトにおいて外部データ収集（Neuron / YGOPRODeck API）、PostgreSQL (Neon) へのマスターデータ登録、およびカード画像ストレージ (AWS S3) 同期を担う AWS Lambda 関数群の API スキーマ、入出力引数定義、および実行時エラー仕様を定義する単一の真実（Single Source of Truth）です。
+
+    ---
+
+    ## 1. システムアーキテクチャと実行モデル
+
+    本システムでは、3 つのコンテナ化された AWS Lambda 関数（Go 1.24, Linux ARM64, provided:al2023）によってバッチ処理およびデータ検証をマイクロサービス的に分担・実行しています。
+
+    | 関数名 | エントリポイント | ローカルポート (RIE) | タイムアウト / メモリ | 責務概要 |
+    | :--- | :--- | :---: | :---: | :--- |
+    | **`cardIdCheck`** | `cmd/aws_lambda/cardIdCheck/main.go` | `9001` | 240秒 / 1024MB | 公式 Neuron DB をスクレイピングし、カード ID の実在判定を行う |
+    | **`cardInfoInsert`** | `cmd/aws_lambda/cardInfoInsert/main.go` | `9002` | 240秒 / 1024MB | 外部 API からカード詳細情報を収集し、Neon DB へ並行挿入する |
+    | **`syncStorageImageWithDB`** | `cmd/aws_lambda/syncStorageImageWithDB/main.go` | `9003` | 300秒 / 1024MB | 外部 CDN の画像を S3 にストリーム同期し、DB の配信 URL を更新する |
+
+    ### 1.1 AWS Lambda 呼び出しプロトコルとエラー伝播
+    AWS Lambda 同期呼び出し（`RequestResponse`）プロトコルにおけるエラーレスポンス区分:
+    1. **正常完了 (`return output, nil`)**:
+       - HTTP ステータスコード: `200 OK`
+       - レスポンスボディ: ハンドラーの戻り値 JSON
+    2. **関数エラー (`return Output{}, fmt.Errorf(...)`)**:
+       - HTTP ステータスコード: `200 OK` (Invoke API 自体は成功)
+       - レスポンスヘッダー: `X-Amz-Function-Error: Unhandled`
+       - レスポンスボディ: `LambdaFunctionError` 形式 (`errorMessage`, `errorType`)
+    3. **部分失敗の許容設計 (Partial Failure Pattern)**:
+       - バッチ処理関数（`cardInfoInsert`, `syncStorageImageWithDB`）では、個別カードの外部通信エラーや未存在に対して **Lambda 関数全体をエラー（Function Error）とせず、正常終了レスポンス内のリスト（`failedIds` や `errors`）に記録して返却** します。
+       - これにより、1 枚の欠損カードによってバッチ全体の処理が中断・リトライ地獄に陥ることを防ぎます。
+
+    ### 1.2 トランザクション境界原則
+    画像同期などの外部通信を伴う処理では、**外部 HTTP 通信や S3 アップロード（外部 I/O）を絶対に DB トランザクション内に含めない** 原則を徹底しています。外部 I/O 完了後にのみ `ExecTx` で DB 更新を行い、コネクション枯渇や長時間ロックを防止します。
+
+    ### 1.3 公式リファレンス
+    - [AWS Lambda: Handling errors in Go](https://docs.aws.amazon.com/lambda/latest/dg/golang-exceptions.html)
+    - [AWS Lambda: Invoke API Reference](https://docs.aws.amazon.com/lambda/latest/dg/API_Invoke.html)
+    - [AWS Lambda: Go function handler defined types](https://docs.aws.amazon.com/lambda/latest/dg/golang-handler.html)
+    - [AWS Lambda Runtime Interface Emulator (RIE)](https://github.com/aws/aws-lambda-runtime-interface-emulator)
+    - [OpenAPI Specification 3.1.0](https://spec.openapis.org/oas/v3.1.0)
+
+servers:
+  - url: http://localhost:9001
+    description: ローカル検証環境 - cardIdCheck RIE エンドポイント
+  - url: http://localhost:9002
+    description: ローカル検証環境 - cardInfoInsert RIE エンドポイント
+  - url: http://localhost:9003
+    description: ローカル検証環境 - syncStorageImageWithDB RIE エンドポイント
+  - url: https://lambda.ap-northeast-1.amazonaws.com
+    description: AWS 本番 / 開発環境 (Lambda Invoke API)
+
+paths:
+  /2015-03-31/functions/cardIdCheck/invocations:
+    post:
+      summary: カードID存在確認 (cardIdCheck)
+      operationId: checkCardId
+      description: |
+        ### 処理概要
+        公式データベース（Neuron DB: `www.db.yugioh-card.com`）のカード検索ページをスクレイピングし、指定されたカード ID (cid) が存在するかどうかを判定します。
+
+        ### スクレイピング対象 URL
+        - `https://www.db.yugioh-card.com/yugiohdb/card_search.action?ope=2&cid={id}&request_locale=ja`
+
+        ### 判定メカニズム (Colly)
+        - **実在判定**: ページ内に `div#cardname` が検出された場合、カードが存在すると判定（`exists: true`）。
+        - **未存在判定**: ページ内に `div.no_data` が検出された場合、カードが存在しないと判定（`exists: false`）。
+
+        ### エラーおよび特異な挙動
+        1. **不正な JSON ペイロード**:
+           - `json.Unmarshal` に失敗した場合は Lambda 関数エラー（Function Error）となり、`LambdaFunctionError` が返却されます。
+        2. **外部通信タイムアウト / 接続遮断**:
+           - Colly の `Visit` 失敗時はコールバックが実行されず、初期値である `exists: false` が返却されます。
+        3. **戻り値形式の特異点**:
+           - Go ハンドラーの実装上 `(string, error)` を返却し、内部でシリアライズした JSON 文字列を返します。Lambda ランタイム経由では文字列としてエンコードされます。
+      requestBody:
+        required: true
+        description: チェック対象のカード ID を含む JSON ペイロード
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardIdCheckInput'
+      responses:
+        '200':
+          description: |
+            判定成功。カードが存在する場合は `exists: true`、存在しない場合は `exists: false` を返却。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardIdCheckOutput'
+              examples:
+                cardExists:
+                  summary: カードが存在する場合
+                  value:
+                    id: "10000"
+                    exists: true
+                cardNotExists:
+                  summary: カードが存在しない場合
+                  value:
+                    id: "99999999"
+                    exists: false
+        '400':
+          description: |
+            リクエスト JSON のパース失敗時（Lambda Function Error: Unhandled）。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LambdaFunctionError'
+              example:
+                errorMessage: "invalid character '}' looking for beginning of object key string"
+                errorType: "*json.SyntaxError"
+
+  /2015-03-31/functions/cardInfoInsert/invocations:
+    post:
+      summary: カード詳細情報収集・DB 登録バッチ (cardInfoInsert)
+      operationId: insertCardInfo
+      description: |
+        ### 処理概要
+        Neuron DB スクレイピングおよび YGOPRODeck API 連携を行い、カード基本レコード、モンスター/魔法/罠詳細、属性・種族マスタ、画像 URL メタデータを Neon DB（PostgreSQL）へ一括挿入します。
+
+        ### バッチ処理範囲
+        - `startId` から連続する `delta` 件（範囲: `[startId, startId + delta)`）を処理対象とします。
+
+        ### 並行処理と流量制御
+        - ワーカープール（Goroutine, 並行度: `runtime.NumCPU() * 2`, 最大 10）を用いてカード単位で並行処理します。
+
+        ### 部分失敗の許容設計 (Partial Failure)
+        - 1 回のリクエストで複数カードを処理する際、一部のカードが未存在（404）や外部 API レート制限、DB 挿入エラー等で失敗しても、**Lambda 全体をエラーとせず、失敗したカード ID を `failedIds` 配列に収集して 200 OK で返却** します。
+        - 全カードが成功した場合は `failedIds: []`（空配列）となります。
+
+        ### 致命的エラー (Function Error)
+        以下の場合は Lambda 関数エラーとなり、処理全体が中断されます:
+        1. **バリデーション違反**: `delta <= 0` が指定された場合 (`delta must be > 0`)
+        2. **JSON アンマーシャル失敗**: リクエストペイロードのキー名・型不一致
+        3. **DB コネクション枯渇 / 全系障害**: データベースへの接続確立不能
+      requestBody:
+        required: true
+        description: バッチ挿入の開始 ID と件数を指定する JSON ペイロード
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardInfoInsertInput'
+      responses:
+        '200':
+          description: |
+            バッチ実行完了。失敗したカード ID がある場合は `failedIds` に含まれ、全件成功時は空配列が返却されます。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardInfoInsertOutput'
+              examples:
+                allSuccess:
+                  summary: 全件挿入成功
+                  value:
+                    failedIds: []
+                partialFailure:
+                  summary: 一部のカードで取得/挿入失敗（部分失敗）
+                  value:
+                    failedIds: [10003, 10007]
+        '400':
+          description: |
+            バリデーションエラー (`delta <= 0`) または JSON パース失敗時（Lambda Function Error: Unhandled）。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LambdaFunctionError'
+              example:
+                errorMessage: "delta must be > 0"
+                errorType: "*errors.errorString"
+
+  /2015-03-31/functions/syncStorageImageWithDB/invocations:
+    post:
+      summary: カード画像 S3 ストリーム同期・DB 更新バッチ (syncStorageImageWithDB)
+      operationId: syncStorageImages
+      description: |
+        ### 処理概要
+        DB（`card_images` テーブル）内の外部画像 URL（`image_url_*_api`）に基づき、画像実体バイナリを外部 CDN から S3（またはローカル MinIO）へストリーミング転送し、アプリ用配信 URL（`image_url_*_this_app`）を DB に書き戻します。
+
+        ### 5 段階処理パイプライン
+        1. **既存レコード取得**: 引数 `ocgCardIds` の各 ID について `card_images` テーブルを検索。未登録の場合は `errors` に記録してスキップ。
+        2. **S3 突合 & スキップ判定**: S3 上の対象キー（`cards/{small|large|cropped}/{image_id}.jpg`）に実体が存在し、かつ DB の URL も設定済みの場合は同期をスキップ（`skippedImageCount` に加算）。
+        3. **ダウンロード対象事前計算**: Small / Large / Cropped の 3 バリエーションについてタスク DTO を生成。
+        4. **ストリーミングアップロード (非トランザクション)**: メモリ上に画像全量を読み込まず、HTTP レスポンスボディ（`io.ReadCloser`）から直接 S3 Transfer Manager へストリーミング転送。外部 CDN 負荷低減のため並行数は 5 に制限。
+        5. **DB トランザクション更新**: S3 アップロード完了後、`transaction.ExecTx` 内で `card_images` の URL カラムを一括更新。
+
+        ### 階層的エラーハンドリング (Partial Failure)
+        - DB レコード未存在、HeadObject エラー、CDN 通信エラー、S3 アップロードエラー、DB 更新エラーのいずれが発生しても、該当カード ID を `failedOcgCardIds` に追加し、詳細メッセージを `errors` 配列に記録して残りのカードの同期を継続します。
+      requestBody:
+        required: true
+        description: 同期対象の親カード OCG ID リストを含む JSON ペイロード
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncImagesInput'
+      responses:
+        '200':
+          description: |
+            同期完了。成功カード ID、失敗カード ID、同期数、スキップ数、および詳細エラー情報が返却されます。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncImagesOutput'
+              examples:
+                completeSuccess:
+                  summary: 全件同期成功
+                  value:
+                    totalProcessedCards: 1
+                    successfulOcgCardIds: [89631139]
+                    failedOcgCardIds: []
+                    syncedImageCount: 3
+                    skippedImageCount: 0
+                    errors: []
+                partialFailureWithErrors:
+                  summary: 一部カードでストリーム取得または S3 転送失敗
+                  value:
+                    totalProcessedCards: 2
+                    successfulOcgCardIds: [89631139]
+                    failedOcgCardIds: [46986414]
+                    syncedImageCount: 3
+                    skippedImageCount: 0
+                    errors:
+                      - ocgCardId: 46986414
+                        ocgApiImageId: 46986414
+                        message: "failed to stream image to S3: connection timeout"
+        '400':
+          description: |
+            バリデーションエラー (`ocgCardIds` が空) または JSON パース失敗時（Lambda Function Error: Unhandled）。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LambdaFunctionError'
+              example:
+                errorMessage: "ocgCardIds must not be empty"
+                errorType: "*errors.errorString"
+
+components:
+  schemas:
+    # -------------------------------------------------------------
+    # cardIdCheck スキーマ定義
+    # -------------------------------------------------------------
+    CardIdCheckInput:
+      type: object
+      required:
+        - id
+      description: cardIdCheck 関数の入力イベント
+      properties:
+        id:
+          type: string
+          description: チェック対象の遊戯王カード CID（Neuron Card ID）。数字文字列形式。
+          example: "10000"
+
+    CardIdCheckOutput:
+      type: object
+      required:
+        - id
+        - exists
+      description: cardIdCheck 関数の判定結果
+      properties:
+        id:
+          type: string
+          description: リクエストされたカード ID。
+          example: "10000"
+        exists:
+          type: boolean
+          description: 公式 Neuron DB にカードが存在する場合は true、未存在の場合は false。
+          example: true
+
+    # -------------------------------------------------------------
+    # cardInfoInsert スキーマ定義
+    # -------------------------------------------------------------
+    CardInfoInsertInput:
+      type: object
+      required:
+        - startId
+        - delta
+      description: cardInfoInsert 関数の入力イベント
+      properties:
+        startId:
+          type: integer
+          format: int64
+          minimum: 0
+          description: バッチ挿入を開始するカード ID。
+          example: 10000
+        delta:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 挿入を試行する連続カード件数。1 以上の整数が必須（delta <= 0 はバリデーションエラー）。
+          example: 10
+
+    CardInfoInsertOutput:
+      type: object
+      required:
+        - failedIds
+      description: cardInfoInsert 関数の出力イベント（部分失敗許容）
+      properties:
+        failedIds:
+          type: array
+          description: スクレイピング失敗、未存在、または DB 挿入失敗となったカード ID の配列。全件成功時は空配列。
+          items:
+            type: integer
+            format: int64
+          example: [10002, 10005]
+
+    # -------------------------------------------------------------
+    # syncStorageImageWithDB スキーマ定義
+    # -------------------------------------------------------------
+    SyncImagesInput:
+      type: object
+      required:
+        - ocgCardIds
+      description: syncStorageImageWithDB 関数の入力イベント
+      properties:
+        ocgCardIds:
+          type: array
+          minItems: 1
+          description: 同期対象とする親カードの ocg_api_id リスト。要素数 1 以上が必須（空配列はバリデーションエラー）。
+          items:
+            type: integer
+            format: int64
+          example: [89631139, 46986414]
+
+    SyncError:
+      type: object
+      required:
+        - ocgCardId
+        - message
+      description: 画像同期中に発生したカード単位・画像単位のエラー詳細
+      properties:
+        ocgCardId:
+          type: integer
+          format: int64
+          description: エラーが発生したカードの ocg_api_id。
+          example: 46986414
+        ocgApiImageId:
+          type: integer
+          format: int64
+          description: エラーが発生した画像の ID（カード未存在時は 0）。
+          example: 46986414
+        message:
+          type: string
+          description: 発生したエラーの根本原因メッセージ（HTTP エラー、S3 エラー、DB エラー等）。
+          example: "failed to stream image to S3: connection timeout"
+
+    SyncImagesOutput:
+      type: object
+      required:
+        - totalProcessedCards
+        - successfulOcgCardIds
+        - failedOcgCardIds
+        - syncedImageCount
+        - skippedImageCount
+        - errors
+      description: syncStorageImageWithDB 関数の同期結果
+      properties:
+        totalProcessedCards:
+          type: integer
+          description: 入力された対象カードの総件数。
+          example: 2
+        successfulOcgCardIds:
+          type: array
+          description: 全バリエーション（Small/Large/Cropped）の同期または検証が完全に成功したカード ID リスト。
+          items:
+            type: integer
+            format: int64
+          example: [89631139]
+        failedOcgCardIds:
+          type: array
+          description: 画像同期、S3 転送、または DB 更新のいずれかで失敗したカード ID リスト。
+          items:
+            type: integer
+            format: int64
+          example: [46986414]
+        syncedImageCount:
+          type: integer
+          description: S3 に新規アップロードおよび DB 更新された画像の総数。
+          example: 3
+        skippedImageCount:
+          type: integer
+          description: 既に S3 に存在し DB も更新済みのため同期をスキップした画像数。
+          example: 0
+        errors:
+          type: array
+          description: 発生した個別エラーの詳細リスト。
+          items:
+            $ref: '#/components/schemas/SyncError'
+
+    # -------------------------------------------------------------
+    # AWS Lambda 共通エラー (Function Error) スキーマ定義
+    # -------------------------------------------------------------
+    LambdaFunctionError:
+      type: object
+      required:
+        - errorMessage
+        - errorType
+      description: AWS Lambda ランタイムまたはハンドラーが返却する未処理関数エラー (Unhandled Error)
+      properties:
+        errorMessage:
+          type: string
+          description: ランタイムまたはハンドラーから返却されたエラーメッセージ文字列。
+          example: "delta must be > 0"
+        errorType:
+          type: string
+          description: Go 言語のエラー型情報。
+          example: "*errors.errorString"
+        stackTrace:
+          type: array
+          description: スタックトレース情報（パニック発生時等に提供される配列）。
+          items:
+            type: string
