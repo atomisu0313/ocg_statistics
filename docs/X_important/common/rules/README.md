@@ -7,6 +7,7 @@
 | **01** | [01_new_table_creation_rules.md](./01_new_table_creation_rules.md) | 新規テーブル追加時の厳格遵守ルール（Up/Down検証、sqlc同期、DTO防波堤、ExecTx/ExecNonTx、test_all.sh、クラス図同期） | [docs/04_new_tables](../../../04_new_tables/01_new_table_implementation_guide.md) |
 | **02** | [02_doc_code_synchronization_rules.md](./02_doc_code_synchronization_rules.md) | コード修正時における docs ドキュメント見直し・同期原則（コード変更箇所の対応 docs 見直し、Doc-Code Drift 防止） | [docs/](../../../README.md) |
 | **03** | [03_security_and_credential_rules.md](./03_security_and_credential_rules.md) | リモート認証情報・パスワード保護原則（コードやcompose.yamlへの本番パスワード直接記述・フォールバック記載の厳格禁止） | [docs/X_important/common/rules](./03_security_and_credential_rules.md) |
+| **04** | [04_mandatory_test_verification_rules.md](./04_mandatory_test_verification_rules.md) | スクリプトを介さない手動テスト実行の禁止および管理スクリプト経由の検証徹底ルール | [docs/06_scripts_general](../../../06_scripts_general/01_script_architecture_and_design_policy.md) |
 
 ---
 
