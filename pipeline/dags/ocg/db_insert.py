@@ -83,6 +83,25 @@ def _update_current_id(current_id_str: str, delta_id_str: str):
         print(f"Error converting current_id to integer: {e}")
         raise
 
+@task(task_id="generate_card_ids")
+def _generate_card_ids(current_id_str: str, delta_id_str: str) -> list[int]:
+    """
+    current_id と delta_id から対象の ocgCardIds リストを生成する
+    """
+    if current_id_str is None or delta_id_str is None:
+        print("Missing current_id or delta_id. Returning empty list.")
+        return []
+
+    try:
+        current_id = int(current_id_str)
+        delta_id = int(delta_id_str)
+        ids = [current_id + i for i in range(delta_id)]
+        print(f"Generated {len(ids)} card IDs: {ids}")
+        return ids
+    except (ValueError, TypeError) as e:
+        print(f"Error generating card IDs: {e}")
+        raise
+
 @task(task_id="alarm_excess_id")
 def _alarm_excess_id():
     print("Alarm excess id")
@@ -121,6 +140,8 @@ with DAG(
     get_max_id_task = _get_max_id_from_store()
     get_delta_id_task = _get_delta_id_from_store()
     
+    generate_card_ids_task = _generate_card_ids(get_current_id_task, get_delta_id_task)
+
     choose_branch_path = _choose_branch_path(get_current_id_task, get_delta_id_task, get_max_id_task)
     alarm_excess_id_task = _alarm_excess_id()
     
@@ -130,8 +151,16 @@ with DAG(
         region_name='ap-northeast-1',
         function_name=os.environ.get('OCG_LAMBDA_FUNCTION_NAME', 'invalid-lambda-function-name'),
         payload='''{
-            "startId": {{ task_instance.xcom_pull(task_ids='get_current_id_from_store') }},
-            "delta":{{ task_instance.xcom_pull(task_ids='get_delta_id_from_store') }}
+            "ocgCardIds": {{ task_instance.xcom_pull(task_ids='generate_card_ids') | tojson }}
+        }''',
+    )
+
+    invoke_sync_image_lambda_task = LambdaInvokeFunctionOperator(
+        task_id="invoke_sync_image_lambda",
+        region_name='ap-northeast-1',
+        function_name=os.environ.get('OCG_SYNC_IMAGE_LAMBDA_FUNCTION_NAME', 'ocg-syncstorageimage'),
+        payload='''{
+            "ocgCardIds": {{ task_instance.xcom_pull(task_ids='generate_card_ids') | tojson }}
         }''',
     )
     
@@ -140,8 +169,10 @@ with DAG(
     end_update_task = EmptyOperator(task_id="end_update_task", trigger_rule="one_success")
 
     start >> start_fetch_param >> [get_current_id_task, get_max_id_task, get_delta_id_task]
+    [get_current_id_task, get_delta_id_task] >> generate_card_ids_task
     choose_branch_path >> [invoke_lambda_function_task, alarm_excess_id_task]
-    invoke_lambda_function_task >> update_id_task
+    generate_card_ids_task >> invoke_lambda_function_task
+    invoke_lambda_function_task >> invoke_sync_image_lambda_task >> update_id_task
     
     [update_id_task, alarm_excess_id_task] >> end_update_task
     end_update_task >> end

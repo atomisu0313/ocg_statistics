@@ -7,7 +7,7 @@ from airflow.models.dag import DAG
 from airflow.decorators import task
 
 # The tasks to be tested
-from ocg.db_insert import _choose_branch_path, _update_current_id
+from ocg.db_insert import _choose_branch_path, _update_current_id, _generate_card_ids, dag as ocg_dag
 
 @pytest.fixture
 def dag_factory():
@@ -166,3 +166,55 @@ def test_update_current_id_no_delta_id(mock_boto3_client, dag_factory):
         Type='String',
         Overwrite=True
     )
+
+# --- Tests for _generate_card_ids ---
+
+def test_generate_card_ids_success():
+    """Tests that _generate_card_ids produces expected consecutive ID list."""
+    # Calling the underlying python function wrapped by @task
+    result = _generate_card_ids.function("100", "5")
+    assert result == [100, 101, 102, 103, 104]
+
+def test_generate_card_ids_none():
+    """Tests that _generate_card_ids returns an empty list when inputs are None."""
+    assert _generate_card_ids.function(None, "5") == []
+    assert _generate_card_ids.function("100", None) == []
+
+def test_generate_card_ids_invalid():
+    """Tests that _generate_card_ids raises ValueError for non-numeric input."""
+    with pytest.raises(ValueError):
+        _generate_card_ids.function("abc", "5")
+
+# --- Tests for DAG structure and dependencies ---
+
+def test_dag_structure_and_dependencies():
+    """Tests that the ocg_db_insert DAG has correct tasks and dependencies."""
+    assert ocg_dag is not None
+    assert ocg_dag.dag_id == "ocg_db_insert"
+
+    task_ids = set(ocg_dag.task_dict.keys())
+    expected_tasks = {
+        "start",
+        "start_fetch_param",
+        "get_current_id_from_store",
+        "get_max_id_from_store",
+        "get_delta_id_from_store",
+        "generate_card_ids",
+        "choose_branch_path",
+        "alarm_excess_id",
+        "invoke_lambda_function",
+        "invoke_sync_image_lambda",
+        "update_current_id",
+        "end_update_task",
+        "end",
+    }
+    assert expected_tasks.issubset(task_ids)
+
+    # Check linear pipeline: invoke_lambda_function -> invoke_sync_image_lambda -> update_current_id
+    insert_task = ocg_dag.get_task("invoke_lambda_function")
+    sync_image_task = ocg_dag.get_task("invoke_sync_image_lambda")
+    update_task = ocg_dag.get_task("update_current_id")
+
+    assert sync_image_task in insert_task.downstream_list
+    assert update_task in sync_image_task.downstream_list
+
