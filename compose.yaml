@@ -40,9 +40,56 @@ services:
       PG_DB_PASSWORD: postgres
       PG_DB_HOST_PORT: ocg_db_local:5432
       PG_DB_NAME: postgres
+      AWS_REGION: ap-northeast-1
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_ENDPOINT_URL: http://minio:9000
+      AWS_S3_USE_PATH_STYLE: "true"
+      CARD_IMAGE_BUCKET_NAME: ocg-card-images
+      CARD_IMAGE_CDN_BASE_URL: http://localhost:9000/ocg-card-images
+    depends_on:
+      minio:
+        condition: service_started
+      minio_create_buckets:
+        condition: service_completed_successfully
+      ocg_db_local:
+        condition: service_started
     entrypoint: /usr/local/bin/aws-lambda-rie
     command: ./main
     restart: unless-stopped
+    networks:
+      - ocg-network
+  minio:
+    image: minio/minio:latest
+    container_name: ocg_minio_local
+    ports:
+      - "9000:9000"
+      - "9004:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_volume_ocg:/data
+    restart: unless-stopped
+    networks:
+      - ocg-network
+  minio_create_buckets:
+    image: minio/mc:latest
+    container_name: ocg_minio_create_buckets
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin); do
+        echo '...waiting for minio to be ready...'
+        sleep 1
+      done;
+      /usr/bin/mc mb --ignore-existing myminio/ocg-card-images;
+      /usr/bin/mc anonymous set download myminio/ocg-card-images;
+      echo 'Bucket ocg-card-images created successfully';
+      exit 0;
+      "
     networks:
       - ocg-network
   ocg_db_local:
@@ -62,6 +109,7 @@ services:
       - ocg-network
 volumes:
   postgres_volume_ocg:
+  minio_volume_ocg:
 
 networks:
   ocg-network:

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"atomisu.com/ocg-statics/cardApiCall/internal/env"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -39,15 +40,25 @@ func NewS3StorageClient(s3Client *s3.Client, bucketName string, region string, c
 func NewS3StorageClientForDI(i *do.Injector) (StorageClient, error) {
 	ctx := context.Background()
 	region := env.GetAsString("AWS_REGION", "ap-northeast-1")
-	bucketName := env.GetAsString("CARD_IMAGE_BUCKET_NAME", "")
-	cdnBaseURL := env.GetAsString("CARD_IMAGE_CDN_BASE_URL", "")
+	bucketName := env.GetAsString("CARD_IMAGE_BUCKET_NAME", env.GetAsString("S3_BUCKET_NAME", ""))
+	cdnBaseURL := env.GetAsString("CARD_IMAGE_CDN_BASE_URL", env.GetAsString("CDN_BASE_URL", ""))
+	endpointURL := env.GetAsString("AWS_ENDPOINT_URL", env.GetAsString("S3_ENDPOINT_URL", ""))
+	usePathStyle := env.GetAsString("AWS_S3_USE_PATH_STYLE", env.GetAsString("S3_USE_PATH_STYLE", "false")) == "true"
 
 	cfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(region))
 	if err != nil {
 		return nil, fmt.Errorf("failed to load aws sdk config: %w", err)
 	}
 
-	s3Client := s3.NewFromConfig(cfg)
+	s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		if endpointURL != "" {
+			o.BaseEndpoint = aws.String(endpointURL)
+			o.UsePathStyle = true
+		}
+		if usePathStyle {
+			o.UsePathStyle = true
+		}
+	})
 	return NewS3StorageClient(s3Client, bucketName, region, cdnBaseURL), nil
 }
 
