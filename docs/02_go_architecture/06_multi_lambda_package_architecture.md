@@ -90,28 +90,25 @@ code/cardApiCall/
 │           ├── main.go                             # 画像ストレージ同期 Lambda ハンドラー
 │           └── app/                                # DI コンテナ初期化 (dependency_injection.go)
 │
-├── internal/                                       # ★ モジュール内部ロジック（Go 言語仕様で外部非公開）
-│   ├── config/                                     # DB接続・プール管理 (database.go, test_database.go)
-│   ├── transaction/                                # トランザクション境界 (ExecTx, ExecNonTx)
-│   ├── sqlc.yaml                                   # sqlc 設定ファイル
-│   ├── sqlc/                                       # db/schema.sql, queries/*.sql
-│   ├── sqlc_gen/                                   # sqlc 自動生成コード（直接編集禁止）
-│   ├── repository/                                 # 各テーブル Repository 実装 & base.go
-│   ├── dto/                                        # 共通 DTO (cardrecord/, kind/ 等)
-│   ├── usecase/                                    # ユースケース層
-│   │   ├── base.go                                 # UseCase 基底 (NewUseCase, ProduceConnDB)
-│   │   ├── master/                                 # カード情報初期挿入オーケストレーション
-│   │   ├── neon/                                   # Neon DB 保存 UseCase 群
-│   │   ├── neuron/                                 # Neuron スクレイピング UseCase
-│   │   ├── tcgapi/                                 # YGOPRODeck API 連携 UseCase
-│   │   └── syncimage/                              # 画像ストレージ同期 UseCase
-│   ├── htmlget/                                    # スクレイピング基底・実装
-│   ├── http/                                       # HTTP 通信基底 (base.go)
-│   ├── env/                                        # 環境変数定義
-│   └── util/                                       # 汎用ユーティリティ
-│
-├── infoInsert/                                     # ※ 既存資産の安全性担保のため無傷で保持
-└── cardidcheck/                                    # ※ 独立モジュールとして無傷で保持
+└── internal/                                       # ★ モジュール内部ロジック（Go 言語仕様で外部非公開）
+    ├── config/                                     # DB接続・プール管理 (database.go, test_database.go)
+    ├── transaction/                                # トランザクション境界 (ExecTx, ExecNonTx)
+    ├── sqlc.yaml                                   # sqlc 設定ファイル
+    ├── sqlc/                                       # db/schema.sql, queries/*.sql
+    ├── sqlc_gen/                                   # sqlc 自動生成コード（直接編集禁止）
+    ├── repository/                                 # 各テーブル Repository 実装 & base.go
+    ├── dto/                                        # 共通 DTO (cardrecord/, kind/ 等)
+    ├── usecase/                                    # ユースケース層
+    │   ├── base.go                                 # UseCase 基底 (NewUseCase, ProduceConnDB)
+    │   ├── master/                                 # カード情報初期挿入オーケストレーション
+    │   ├── neon/                                   # Neon DB 保存 UseCase 群
+    │   ├── neuron/                                 # Neuron スクレイピング UseCase
+    │   ├── tcgapi/                                 # YGOPRODeck API 連携 UseCase
+    │   └── syncimage/                              # 画像ストレージ同期 UseCase
+    ├── htmlget/                                    # スクレイピング基底・実装
+    ├── http/                                       # HTTP 通信基底 (base.go)
+    ├── env/                                        # 環境変数定義
+    └── util/                                       # 汎用ユーティリティ
 ```
 
 ---
@@ -199,9 +196,3 @@ ENTRYPOINT [ "./main" ]
 | [`scripts/code/cardApiCall/syncstorageimage/build_and_push_to_ecr.sh`](../../scripts/code/cardApiCall/syncstorageimage/build_and_push_to_ecr.sh) | syncStorageImage ECR ビルド＆プッシュ手動実行 |
 | [`scripts/code/cardApiCall/internal/sqlc_generate.sh`](../../scripts/code/cardApiCall/internal/sqlc_generate.sh) | `internal/sqlc.yaml` からの sqlc コード自動生成 |
 
----
-
-## 7. 既存資産（`infoInsert`, `cardidcheck`）の安全性
-
-既存の [code/cardApiCall/infoInsert](../../code/cardApiCall/infoInsert) および [code/cardApiCall/cardidcheck](../../code/cardApiCall/cardidcheck) は、今回のリファクタリングにおいて **一切変更を加えていません**。  
-万が一のトラブル時にもいつでも元のコード・テストを参照・実行可能な状態を維持しています。
