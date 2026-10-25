@@ -119,7 +119,7 @@ code/cardApiCall/
 - **責務**:
   - AWS Lambda のイベントハンドラー（`HandleRequest`）の定義。
   - DI コンテナ（`app.SetupDIContainer()`）の初期化と、リクエストごとの UseCase 呼び出し。
-  - 入出力 JSON のマッピングと入力バリデーション（`startId`, `delta` の正当性チェック）。
+  - 入出力 JSON のマッピングと入力バリデーション（`ocgCardIds` の正当性チェック）。
 - **ルール**:
   - ビジネスロジックや直接の DB アクセス（SQL 実行）を書いてはならない。
   - 必ず `internal/usecase` を DI 経由で呼び出す。
@@ -190,7 +190,7 @@ ENTRYPOINT [ "./main" ]
 | :--- | :--- |
 | [`scripts/code/cardApiCall/cardidcheck/build_and_push_to_ecr.sh`](../../scripts/code/cardApiCall/cardidcheck/build_and_push_to_ecr.sh) | cardIdCheck ECR ビルド＆プッシュ手動実行 |
 | [`scripts/code/cardApiCall/cardinfoinsert/test_all.sh`](../../scripts/code/cardApiCall/cardinfoinsert/test_all.sh) | `internal` 構造に対応した全単体・結合テストの実行 |
-| [`scripts/code/cardApiCall/cardinfoinsert/local_test.sh`](../../scripts/code/cardApiCall/cardinfoinsert/local_test.sh) | ポート `9002` へのリクエストテスト（デフォルト: startId=100, delta=10） |
+| [`scripts/code/cardApiCall/cardinfoinsert/local_test.sh`](../../scripts/code/cardApiCall/cardinfoinsert/local_test.sh) | ポート `9002` へのリクエストテスト（デフォルト: ocgCardIds=[100, 101, 102]） |
 | [`scripts/code/cardApiCall/syncstorageimage/local_test.sh`](../../scripts/code/cardApiCall/syncstorageimage/local_test.sh) | ポート `9003` へのリクエストテスト |
 | [`scripts/code/cardApiCall/cardinfoinsert/build_and_push_to_ecr.sh`](../../scripts/code/cardApiCall/cardinfoinsert/build_and_push_to_ecr.sh) | cardInfoInsert ECR ビルド＆プッシュ手動実行 |
 | [`scripts/code/cardApiCall/syncstorageimage/build_and_push_to_ecr.sh`](../../scripts/code/cardApiCall/syncstorageimage/build_and_push_to_ecr.sh) | syncStorageImage ECR ビルド＆プッシュ手動実行 |

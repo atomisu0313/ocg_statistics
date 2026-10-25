@@ -23,6 +23,7 @@ type masterUseCaseImpl struct {
 type MasterUseCase interface {
 	InsertCardInfo(ctx context.Context, neuronCardID int64) (int64, error)
 	InsertCardInfoList(ctx context.Context, startId int64, delta int64) ([]int64, error)
+	InsertCardInfoListByOcgCardIds(ctx context.Context, ocgCardIds []int64) ([]int64, error)
 }
 
 // NewMasterUseCase は、MasterUseCaseの純粋なコンストラクタです（Pure DI）。
@@ -75,20 +76,37 @@ func (m *masterUseCaseImpl) InsertCardInfo(ctx context.Context, neuronCardID int
 	return cardID, nil
 }
 
-func (m *masterUseCaseImpl) InsertCardInfoList(ctx context.Context, startId int64, delta int64) ([]int64, error) {
+func (m *masterUseCaseImpl) InsertCardInfoListByOcgCardIds(ctx context.Context, ocgCardIds []int64) ([]int64, error) {
+	if len(ocgCardIds) == 0 {
+		return []int64{}, nil
+	}
+
 	// 並行度を制御（CPUコア数の2倍、最大10）
 	maxWorkers := runtime.NumCPU() * 2
 	if maxWorkers > 10 {
 		maxWorkers = 10
 	}
 
-	return m.insertCardInfoListWithWorkers(ctx, startId, delta, maxWorkers)
+	return m.insertCardInfoListWithWorkers(ctx, ocgCardIds, maxWorkers)
+}
+
+func (m *masterUseCaseImpl) InsertCardInfoList(ctx context.Context, startId int64, delta int64) ([]int64, error) {
+	if delta <= 0 {
+		return []int64{}, nil
+	}
+
+	ids := make([]int64, 0, delta)
+	for id := startId; id < startId+delta; id++ {
+		ids = append(ids, id)
+	}
+
+	return m.InsertCardInfoListByOcgCardIds(ctx, ids)
 }
 
 // insertCardInfoListWithWorkers は、指定されたワーカー数で並行処理を行います
-func (m *masterUseCaseImpl) insertCardInfoListWithWorkers(ctx context.Context, startId int64, delta int64, maxWorkers int) ([]int64, error) {
-	if delta <= 0 {
-		return nil, nil
+func (m *masterUseCaseImpl) insertCardInfoListWithWorkers(ctx context.Context, ocgCardIds []int64, maxWorkers int) ([]int64, error) {
+	if len(ocgCardIds) == 0 {
+		return []int64{}, nil
 	}
 
 	// Job channel に ID を流し、固定数のワーカーで処理する
@@ -113,7 +131,7 @@ func (m *masterUseCaseImpl) insertCardInfoListWithWorkers(ctx context.Context, s
 	// ジョブ送信を別ゴルーチンで行い、終了後に jobs を閉じる
 	go func() {
 		defer close(jobs)
-		for id := startId; id < startId+delta; id++ {
+		for _, id := range ocgCardIds {
 			jobs <- id
 		}
 	}()

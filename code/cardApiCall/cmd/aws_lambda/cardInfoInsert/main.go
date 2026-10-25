@@ -12,8 +12,7 @@ import (
 )
 
 type Input struct {
-	StartId int64 `json:"startId"`
-	Delta   int64 `json:"delta"`
+	OcgCardIds []int64 `json:"ocgCardIds"`
 }
 
 type Output struct {
@@ -36,16 +35,19 @@ func HandleRequest(ctx context.Context, event json.RawMessage) (Output, error) {
 	}
 
 	// 入力バリデーション
-	if input.Delta <= 0 {
-		return Output{}, fmt.Errorf("delta must be > 0")
+	if len(input.OcgCardIds) == 0 {
+		return Output{}, fmt.Errorf("ocgCardIds must not be empty")
 	}
 
 	masterUseCase := do.MustInvoke[master.MasterUseCase](globalInjector)
 
 	// カード情報を挿入
-	failedIds, err := masterUseCase.InsertCardInfoList(ctx, input.StartId, input.Delta)
+	failedIds, err := masterUseCase.InsertCardInfoListByOcgCardIds(ctx, input.OcgCardIds)
 	if err != nil {
 		return Output{}, err
+	}
+	if failedIds == nil {
+		failedIds = []int64{}
 	}
 
 	return Output{FailedIds: failedIds}, nil

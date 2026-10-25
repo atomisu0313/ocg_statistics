@@ -110,10 +110,14 @@ flowchart TD
 - **コミットメッセージ規約**:
   - 形式: `<type>: 【<カテゴリ>】<変更内容の要約> #<Issue番号>`
   - 例: `fix: 【Lambda】余分なディレクトリcmd_aws_lambdaに入っていないcardIdcheck実装を削除 #9`
+- **プッシュ先の厳格な制約（重要）**:
+  - **`main` ブランチへの直接プッシュ（`git push origin main`）は固く禁止** されています。
+  - 必ず Step 3 で作成した作業用ブランチ（`feature/...` または `fix/...`）に対してプッシュしてください。
 - **実行コマンド例**:
   ```bash
   git add <変更ファイル>
   git commit -m "fix: 【Lambda】余分なディレクトリcmd_aws_lambdaに入っていないcardIdcheck実装を削除 #9"
+  # main ではなく、必ず対象の作業ブランチにプッシュする
   git push origin fix/issue-9-remove-legacy-cardidcheck
   ```
 
@@ -129,7 +133,7 @@ flowchart TD
 
 ---
 
-## 3. 開発時の 4 大鉄則（プロジェクト規約）
+## 3. 開発時の 5 大鉄則（プロジェクト規約）
 
 | 原則 | 内容 | 根拠ドキュメント |
 | :--- | :--- | :--- |
@@ -137,6 +141,7 @@ flowchart TD
 | **2. コード・ドキュメント同時同期原則** | コードの削除・変更を行った際は、該当する `docs/` 配下の設計書・ツリー図・参照記述を必ず同一タスク内で同期する。 | [02_doc_code_synchronization_rules.md](../X_important/common/rules/02_doc_code_synchronization_rules.md) |
 | **3. ドキュメント内絶対パス記述厳格禁止** | ドキュメント内に `/Users/...` や `file://` を記述することを固く禁止し、必ず相対パスでリンクする。 | [01_prohibit_absolute_path_rules.md](../X_important/document/rules/01_prohibit_absolute_path_rules.md) |
 | **4. スコープ厳守原則** | Issue の要件および制約（「スクリプトおよび該当コード以外は原則触らない」等）を厳守し、不要な変更を含めない。 | 各 Issue の仕様 |
+| **5. 作業ブランチプッシュ徹底原則** | `main` ブランチへの直接プッシュは固く禁止。変更は必ず作成した feature / fix ブランチに push すること。 | 本ドキュメント Step 9 |
 
 ---
 
@@ -150,6 +155,7 @@ PR を作成する前に、以下の項目をセルフチェックしてくだ�
 - [ ] 対象バイナリやコンテナのビルドが正常に通るか？
 - [ ] ドキュメント内の古い参照・不要セクションを削除・更新したか？
 - [ ] ドキュメント内にローカル絶対パス（`/Users/...` など）が含まれていないか？
+- [ ] **`main` ではなく、作業用の feature / fix ブランチにプッシュしているか？**
 - [ ] コミットメッセージおよび PR タイトルに Issue 番号が含まれているか？
 - [ ] PR 本文に `Closes #<Issue番号>` が記載されているか？
 - [ ] Issue に対応完了サマリーと PR リンクのコメントを投稿したか？

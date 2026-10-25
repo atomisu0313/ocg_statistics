@@ -136,53 +136,42 @@ paths:
       requestBody:
         description: |
           cardInfoInsert 関数の入力 JSON ペイロード仕様。
-          バッチ処理の開始カード ID (`startId`) と、そこから連続して処理する件数 (`delta`) を指定します。
+          外部 API からカード詳細情報を収集し DB へ挿入する対象のカード OCG ID リスト (`ocgCardIds`) を指定します。
         required: true
         content:
           application/json:
             schema:
               type: object
               required:
-                - startId
-                - delta
+                - ocgCardIds
               properties:
-                startId:
-                  type: integer
-                  format: int64
-                  minimum: 0
+                ocgCardIds:
+                  type: array
+                  minItems: 1
                   description: |
-                    バッチ収集を開始する起点のカード ID（Neuron CID / YGOPRODeck ID）。
-                    - 型: 64bit 整数 (`integer`, `int64`)
+                    収集・登録対象とするカードの OCG カード ID（公式 Neuron CID）の配列。
+                    - 型: 64bit 整数の配列 (`array[integer(int64)]`)
                     - 必須: 必須 (`required: true`)
-                    - 制約: 0 以上の整数 (`minimum: 0`)
-                    - 用途: 処理対象範囲の開始インデックス `startId`
-                  example: 10000
-                delta:
-                  type: integer
-                  format: int64
-                  minimum: 1
-                  description: |
-                    startId から連続して取得・挿入を試行するカード件数。
-                    - 型: 64bit 整数 (`integer`, `int64`)
-                    - 必須: 必須 (`required: true`)
-                    - 制約: 1 以上の整数 (`minimum: 1`)
-                    - 処理範囲: `[startId, startId + delta)`
+                    - 制約: 要素数 1 以上の配列 (`minItems: 1`)
                     - バリデーションルール:
-                      - `delta <= 0` の場合はハンドラー冒頭でバリデーションエラー (`delta must be > 0`) が発生し、Lambda 関数エラー（Function Error）として即座に中断されます。
-                  example: 10
+                      - 空配列（`[]`）または未指定の場合はハンドラー冒頭でバリデーションエラー (`ocgCardIds must not be empty`) が発生し、Lambda 関数エラー（Function Error）として即座に中断されます。
+                  items:
+                    type: integer
+                    format: int64
+                    minimum: 1
+                    description: 対象カードの OCG カード ID (Neuron CID)
+                  example: [10000, 10001, 10002]
             examples:
               batchNormal:
-                summary: 標準バッチリクエスト (10件処理)
-                description: ID 10000 から 10 件（10000 〜 10009）を並行バッチ処理
+                summary: 標準バッチリクエスト (複数件処理)
+                description: 指定された OCG カード ID (CID) リストを並行バッチ処理
                 value:
-                  startId: 10000
-                  delta: 10
+                  ocgCardIds: [10000, 10001, 10002]
               batchSingle:
                 summary: 単一カード処理 (1件)
                 description: 特定の 1 枚のみを取得・挿入
                 value:
-                  startId: 89631139
-                  delta: 1
+                  ocgCardIds: [10000]
       responses:
         '200':
           description: |
@@ -223,15 +212,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/LambdaFunctionError'
               examples:
-                validationErrorDelta:
-                  summary: delta <= 0 バリデーションエラー
+                validationErrorEmptyIds:
+                  summary: ocgCardIds 空配列バリデーションエラー
                   value:
-                    errorMessage: "delta must be > 0"
+                    errorMessage: "ocgCardIds must not be empty"
                     errorType: "*errors.errorString"
                 invalidJson:
                   summary: JSON パースエラー
                   value:
-                    errorMessage: "json: cannot unmarshal string into Go struct field Input.delta of type int64"
+                    errorMessage: "json: cannot unmarshal string into Go struct field Input.ocgCardIds of type []int64"
                     errorType: "*json.UnmarshalTypeError"
 
   # =================================================================
@@ -418,24 +407,21 @@ components:
     CardInfoInsertInput:
       type: object
       required:
-        - startId
-        - delta
+        - ocgCardIds
       description: cardInfoInsert 関数の入力イベントペイロード
       properties:
-        startId:
-          type: integer
-          format: int64
-          minimum: 0
-          description: バッチ挿入を開始する起点カード ID（Neuron CID / YGOPRODeck ID）。0 以上の整数。
-          example: 10000
-        delta:
-          type: integer
-          format: int64
-          minimum: 1
+        ocgCardIds:
+          type: array
+          minItems: 1
           description: |
-            起点 startId から連続して取得・挿入を試行するカード件数。
-            1 以上の整数が必須（delta <= 0 はバリデーションエラー）。
-          example: 10
+            収集・登録対象とするカードの OCG カード ID（公式 Neuron CID）リスト。
+            要素数 1 以上の整数配列が必須（空配列はバリデーションエラー）。
+          items:
+            type: integer
+            format: int64
+            minimum: 1
+            description: 対象カードの OCG カード ID (Neuron CID)
+          example: [10000, 10001, 10002]
 
     CardInfoInsertOutput:
       type: object
