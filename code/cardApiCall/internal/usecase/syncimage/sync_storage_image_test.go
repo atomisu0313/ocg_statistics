@@ -41,13 +41,13 @@ func (m *mockCardImageRepository) ListCardImagesByCardID(ctx context.Context, ca
 	return nil, nil
 }
 
-func (m *mockCardImageRepository) ListCardImagesByOcgApiCardID(ctx context.Context, ocgApiCardID int64) ([]sqlc_gen.CardImage, error) {
+func (m *mockCardImageRepository) ListCardImagesByNeuronID(ctx context.Context, neuronID int64) ([]sqlc_gen.CardImage, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.listErr != nil {
 		return nil, m.listErr
 	}
-	return m.records[ocgApiCardID], nil
+	return m.records[neuronID], nil
 }
 
 func (m *mockCardImageRepository) ListPendingSyncCardImages(ctx context.Context, limit int32) ([]sqlc_gen.CardImage, error) {
@@ -148,22 +148,22 @@ func TestSyncStorageImagesByCardIDs(t *testing.T) {
 		stream := newMockStreamClient()
 		uc := syncimage.NewSyncStorageImageUseCase(nil, repo, storage, stream)
 
-		output, err := uc.SyncStorageImagesByCardIDs(ctx, []int64{})
+		output, err := uc.SyncStorageImagesByNeuronIDs(ctx, []int64{})
 		assert.Error(t, err)
 		assert.Nil(t, output)
 	})
 
-	t.Run("DBに対象カードレコードが存在しない場合は failedOcgCardIds に記録される", func(t *testing.T) {
+	t.Run("DBに対象カードレコードが存在しない場合は failedNeuronCardIds に記録される", func(t *testing.T) {
 		repo := newMockCardImageRepository()
 		storage := newMockStorageClient()
 		stream := newMockStreamClient()
 		uc := syncimage.NewSyncStorageImageUseCase(nil, repo, storage, stream)
 
-		output, err := uc.SyncStorageImagesByCardIDs(ctx, []int64{99999999})
+		output, err := uc.SyncStorageImagesByNeuronIDs(ctx, []int64{99999999})
 		require.NoError(t, err)
 		assert.Equal(t, 1, output.TotalProcessedCards)
-		assert.Empty(t, output.SuccessfulOcgCardIds)
-		assert.Equal(t, []int64{99999999}, output.FailedOcgCardIds)
+		assert.Empty(t, output.SuccessfulNeuronCardIds)
+		assert.Equal(t, []int64{99999999}, output.FailedNeuronCardIds)
 		assert.Equal(t, 0, output.SyncedImageCount)
 		assert.Equal(t, 0, output.SkippedImageCount)
 		assert.Len(t, output.Errors, 1)
@@ -176,12 +176,12 @@ func TestSyncStorageImagesByCardIDs(t *testing.T) {
 		stream := newMockStreamClient()
 		uc := syncimage.NewSyncStorageImageUseCase(nil, repo, storage, stream)
 
-		cardID := int64(89631139)
+		neuronID := int64(89631139)
 		imageID := int64(89631139)
-		repo.records[cardID] = []sqlc_gen.CardImage{
+		repo.records[neuronID] = []sqlc_gen.CardImage{
 			{
 				ID:                 1,
-				OcgApiCardID:       cardID,
+				OcgApiCardID:       neuronID,
 				OcgApiImageID:      imageID,
 				ImageUrlSmallApi:   "https://images.ygoprodeck.com/images/cards_small/89631139.jpg",
 				ImageUrlLargeApi:   "https://images.ygoprodeck.com/images/cards/89631139.jpg",
@@ -189,12 +189,12 @@ func TestSyncStorageImagesByCardIDs(t *testing.T) {
 			},
 		}
 
-		output, err := uc.SyncStorageImagesByCardIDs(ctx, []int64{cardID})
+		output, err := uc.SyncStorageImagesByNeuronIDs(ctx, []int64{neuronID})
 		require.NoError(t, err)
 
 		assert.Equal(t, 1, output.TotalProcessedCards)
-		assert.Equal(t, []int64{cardID}, output.SuccessfulOcgCardIds)
-		assert.Empty(t, output.FailedOcgCardIds)
+		assert.Equal(t, []int64{neuronID}, output.SuccessfulNeuronCardIds)
+		assert.Empty(t, output.FailedNeuronCardIds)
 		assert.Equal(t, 3, output.SyncedImageCount)
 		assert.Equal(t, 0, output.SkippedImageCount)
 		assert.Empty(t, output.Errors)
@@ -222,7 +222,7 @@ func TestSyncStorageImagesByCardIDs(t *testing.T) {
 		stream := newMockStreamClient()
 		uc := syncimage.NewSyncStorageImageUseCase(nil, repo, storage, stream)
 
-		cardID := int64(89631139)
+		neuronID := int64(89631139)
 		imageID := int64(89631139)
 
 		// S3に既に存在
@@ -231,10 +231,10 @@ func TestSyncStorageImagesByCardIDs(t *testing.T) {
 		storage.existingKeys[fmt.Sprintf("cards/cropped/%d.jpg", imageID)] = true
 
 		// DBにも既に設定済み
-		repo.records[cardID] = []sqlc_gen.CardImage{
+		repo.records[neuronID] = []sqlc_gen.CardImage{
 			{
 				ID:                     1,
-				OcgApiCardID:           cardID,
+				OcgApiCardID:           neuronID,
 				OcgApiImageID:          imageID,
 				ImageUrlSmallApi:       "https://images.ygoprodeck.com/images/cards_small/89631139.jpg",
 				ImageUrlLargeApi:       "https://images.ygoprodeck.com/images/cards/89631139.jpg",
@@ -245,12 +245,12 @@ func TestSyncStorageImagesByCardIDs(t *testing.T) {
 			},
 		}
 
-		output, err := uc.SyncStorageImagesByCardIDs(ctx, []int64{cardID})
+		output, err := uc.SyncStorageImagesByNeuronIDs(ctx, []int64{neuronID})
 		require.NoError(t, err)
 
 		assert.Equal(t, 1, output.TotalProcessedCards)
-		assert.Equal(t, []int64{cardID}, output.SuccessfulOcgCardIds)
-		assert.Empty(t, output.FailedOcgCardIds)
+		assert.Equal(t, []int64{neuronID}, output.SuccessfulNeuronCardIds)
+		assert.Empty(t, output.FailedNeuronCardIds)
 		assert.Equal(t, 0, output.SyncedImageCount)
 		assert.Equal(t, 3, output.SkippedImageCount)
 		assert.Empty(t, storage.uploadedKeys)
@@ -262,25 +262,25 @@ func TestSyncStorageImagesByCardIDs(t *testing.T) {
 		stream := newMockStreamClient()
 		uc := syncimage.NewSyncStorageImageUseCase(nil, repo, storage, stream)
 
-		cardSuccess := int64(89631139)
-		cardFail := int64(46986414)
+		neuronSuccess := int64(89631139)
+		neuronFail := int64(46986414)
 
-		repo.records[cardSuccess] = []sqlc_gen.CardImage{
+		repo.records[neuronSuccess] = []sqlc_gen.CardImage{
 			{
 				ID:                 1,
-				OcgApiCardID:       cardSuccess,
-				OcgApiImageID:      cardSuccess,
+				OcgApiCardID:       neuronSuccess,
+				OcgApiImageID:      neuronSuccess,
 				ImageUrlSmallApi:   "https://images.ygoprodeck.com/images/cards_small/89631139.jpg",
 				ImageUrlLargeApi:   "https://images.ygoprodeck.com/images/cards/89631139.jpg",
 				ImageUrlCroppedApi: "https://images.ygoprodeck.com/images/cards_cropped/89631139.jpg",
 			},
 		}
 
-		repo.records[cardFail] = []sqlc_gen.CardImage{
+		repo.records[neuronFail] = []sqlc_gen.CardImage{
 			{
 				ID:                 2,
-				OcgApiCardID:       cardFail,
-				OcgApiImageID:      cardFail,
+				OcgApiCardID:       neuronFail,
+				OcgApiImageID:      neuronFail,
 				ImageUrlSmallApi:   "https://fail-url.com/small.jpg",
 				ImageUrlLargeApi:   "https://fail-url.com/large.jpg",
 				ImageUrlCroppedApi: "https://fail-url.com/cropped.jpg",
@@ -290,12 +290,12 @@ func TestSyncStorageImagesByCardIDs(t *testing.T) {
 		// 特定URLでストリーミング失敗をシミュレート
 		stream.streamErr = fmt.Errorf("connection timeout")
 
-		output, err := uc.SyncStorageImagesByCardIDs(ctx, []int64{cardFail, cardSuccess})
+		output, err := uc.SyncStorageImagesByNeuronIDs(ctx, []int64{neuronFail, neuronSuccess})
 		require.NoError(t, err)
 
 		assert.Equal(t, 2, output.TotalProcessedCards)
-		assert.Equal(t, 2, len(output.FailedOcgCardIds))
-		assert.Contains(t, output.FailedOcgCardIds, cardFail)
+		assert.Equal(t, 2, len(output.FailedNeuronCardIds))
+		assert.Contains(t, output.FailedNeuronCardIds, neuronFail)
 		assert.NotEmpty(t, output.Errors)
 	})
 }

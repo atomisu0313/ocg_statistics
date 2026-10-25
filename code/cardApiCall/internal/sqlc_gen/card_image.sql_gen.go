@@ -124,14 +124,15 @@ func (q *Queries) ListCardImagesByCardID(ctx context.Context, cardID sql.NullInt
 	return items, nil
 }
 
-const listCardImagesByOcgApiCardID = `-- name: ListCardImagesByOcgApiCardID :many
-SELECT id, ocg_api_image_id, ocg_api_card_id, card_id, image_url_small_api, image_url_large_api, image_url_cropped_api, image_url_small_this_app, image_url_large_this_app, image_url_cropped_this_app, dataowner, regist_date, enable_start_date, enable_end_date, version FROM card_images
-WHERE ocg_api_card_id = $1
-ORDER BY id
+const listCardImagesByNeuronID = `-- name: ListCardImagesByNeuronID :many
+SELECT ci.id, ci.ocg_api_image_id, ci.ocg_api_card_id, ci.card_id, ci.image_url_small_api, ci.image_url_large_api, ci.image_url_cropped_api, ci.image_url_small_this_app, ci.image_url_large_this_app, ci.image_url_cropped_this_app, ci.dataowner, ci.regist_date, ci.enable_start_date, ci.enable_end_date, ci.version FROM card_images ci
+JOIN cards c ON ci.card_id = c.id
+WHERE c.neuron_id = $1
+ORDER BY ci.id
 `
 
-func (q *Queries) ListCardImagesByOcgApiCardID(ctx context.Context, ocgApiCardID int64) ([]CardImage, error) {
-	rows, err := q.db.QueryContext(ctx, listCardImagesByOcgApiCardID, ocgApiCardID)
+func (q *Queries) ListCardImagesByNeuronID(ctx context.Context, neuronID sql.NullInt64) ([]CardImage, error) {
+	rows, err := q.db.QueryContext(ctx, listCardImagesByNeuronID, neuronID)
 	if err != nil {
 		return nil, err
 	}

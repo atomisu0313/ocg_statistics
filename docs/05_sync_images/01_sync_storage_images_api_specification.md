@@ -10,16 +10,16 @@
 `cardInfoInsert` Lambda によって `card_images` テーブルに登録された外部 API URL（`image_url_*_api`）に基づき、画像実体バイナリを S3 に永続化し、本アプリ用配信 URL（`image_url_*_this_app`）を DB に書き戻す。
 
 ### 1.2 主な処理要件
-1. **入力**: 対象 OCG_ID のリストを受け取る。
+1. **入力**: 対象 Neuron CID（`cards.neuron_id`）のリストを受け取る。
 2. **既存登録情報の突合**:
-   - DB（`card_images` テーブル）より対象カードの画像レコード群を取得する。
+   - DB（`card_images` テーブルを `cards` テーブルと JOIN）より対象カードの画像レコード群を取得する（`ListCardImagesByNeuronID`）。
    - S3 上にすでにオブジェクトが存在するかを検証する。
 3. **ダウンロード対象 DTO の事前計算**:
    - 同期対象のバリエーション（Small / Large / Cropped）ごとに S3 保存キー・パスおよび tcg_api 上の ID を算出する。
 4. **Stream によるダウンロード＆プッシュ**:
    - メモリ上に画像全量を一度に保持せず、外部 HTTP レスポンスストリームから S3 へのストリーミングアップロードを行う。
 5. **成功した ID の集計**:
-   - 同期に成功した画像の `ocg_api_image_id` および親カードの `ocg_api_card_id` を集計する。
+   - 同期に成功した画像の `ocg_api_image_id` および親カードの `neuron_id` を集計する。
 6. **DB レコードの更新**:
    - S3 バケットの配信パス（または CloudFront 配信 URL）を算出し、`card_images` テーブルの `image_url_*_this_app` カラムを更新する。
 
@@ -31,33 +31,33 @@
 
 ```json
 {
-  "ocgCardIds": [
-    89631139,
-    46986414
+  "neuronCardIds": [
+    4000,
+    4001
   ]
 }
 ```
 
 | フィールド名 | 型 | 必須 | 説明 | 例 |
 | :--- | :--- | :---: | :--- | :--- |
-| `ocgCardIds` | `[]int64` | ○ | 同期対象とする親カードの `ocg_api_id`（遊戯王カード固有ID）リスト。空配列の場合はエラー。 | `[89631139, 46986414]` |
+| `neuronCardIds` | `[]int64` | ○ | 同期対象とする親カードの `neuron_id`（Neuron CID）リスト。空配列の場合はエラー。 | `[4000, 4001]` |
 
 ### 2.2 レスポンス仕様 (Output Event)
 
 ```json
 {
   "totalProcessedCards": 2,
-  "successfulOcgCardIds": [
-    89631139
+  "successfulNeuronCardIds": [
+    4000
   ],
-  "failedOcgCardIds": [
-    46986414
+  "failedNeuronCardIds": [
+    4001
   ],
   "syncedImageCount": 3,
   "skippedImageCount": 0,
   "errors": [
     {
-      "ocgCardId": 46986414,
+      "neuronCardId": 4001,
       "ocgApiImageId": 46986414,
       "message": "failed to stream image to S3: connection timeout"
     }
@@ -68,8 +68,8 @@
 | フィールド名 | 型 | 説明 |
 | :--- | :--- | :--- |
 | `totalProcessedCards` | `int` | 対象となったカードの総件数。 |
-| `successfulOcgCardIds` | `[]int64` | 全画像の同期または検証が完全に成功した親カードの `ocg_api_id` リスト。 |
-| `failedOcgCardIds` | `[]int64` | 画像同期中にエラーが発生した親カードの `ocg_api_id` リスト。 |
+| `successfulNeuronCardIds` | `[]int64` | 全画像の同期または検証が完全に成功した親カードの `neuron_id` リスト。 |
+| `failedNeuronCardIds` | `[]int64` | 画像同期中にエラーが発生した親カードの `neuron_id` リスト。 |
 | `syncedImageCount` | `int` | S3 に新規アップロードおよび DB 更新された画像数（Small/Large/Cropped 合計）。 |
 | `skippedImageCount` | `int` | S3 に既に存在し、DB も更新済みのため同期をスキップした画像数。 |
 | `errors` | `[]SyncError` | 発生したエラーの詳細リスト。 |
@@ -84,15 +84,15 @@ sequenceDiagram
     actor Caller as 呼出元 (Airflow / EventBridge / 手動)
     participant Lambda as Lambda: syncStorageImageWithDB
     participant UseCase as SyncImageUseCase
-    participant DB as Neon DB (card_images)
+    participant DB as Neon DB (card_images JOIN cards)
     participant S3 as AWS S3 Storage
     participant ExtCDN as YGOPRODeck CDN
 
-    Caller->>Lambda: Invoke(ocgCardIds)
-    Lambda->>UseCase: SyncStorageImagesByCardIDs(ctx, ocgCardIds)
+    Caller->>Lambda: Invoke(neuronCardIds)
+    Lambda->>UseCase: SyncStorageImagesByNeuronIDs(ctx, neuronCardIds)
 
-    loop 各 ocgCardId ごと
-        UseCase->>DB: ListCardImagesByOcgApiCardID(ocgCardId)
+    loop 各 neuronCardId ごと
+        UseCase->>DB: ListCardImagesByNeuronID(neuronCardId)
         DB-->>UseCase: []card_images レコード
         
         loop 各 card_image レコードごと
@@ -124,8 +124,8 @@ sequenceDiagram
 ## 4. 詳細処理フロー
 
 ### 4.1 Step 1: 既存登録情報の突合
-1. 引数で渡された `ocgCardIds` の各 ID について、`card_images` テーブルから該当レコードを検索する（`WHERE ocg_api_card_id = $1`）。
-2. レコードが存在しない場合、対象カードが未インサートであるため `failedOcgCardIds` に記録しスキップする。
+1. 引数で渡された `neuronCardIds` の各 ID について、`cards` テーブルと JOIN して `card_images` テーブルから該当レコードを検索する（`WHERE c.neuron_id = $1`）。
+2. レコードが存在しない場合、対象カードが未インサートであるため `failedNeuronCardIds` に記録しスキップする。
 3. 取得した `card_images` レコード内の `image_url_*_this_app` を検査する。
 4. S3 クライアントの `HeadObject` API を用いて、S3 上の対象キーに実体ファイルが存在するか突合する。
    - S3 に存在し、かつ DB の `image_url_*_this_app` も設定済みの場合は同期不要（スキップ）。
@@ -144,7 +144,7 @@ sequenceDiagram
 ```go
 type ImageSyncTaskDTO struct {
     CardImageID    int64
-    OcgApiCardID   int64
+    NeuronID       int64
     OcgApiImageID  int64
     Variant        ImageVariant // Small, Large, Cropped
     SourceURL      string
@@ -162,8 +162,8 @@ type ImageSyncTaskDTO struct {
 
 ### 4.4 Step 4: 成功した ID の集計
 - 各画像タスクの完了ステータスを監視する。
-- 1 枚のカード画像に紐づくすべてのバリエーション（Small/Large/Cropped）の S3 転送が成功した場合に、その `ocg_api_card_id` を `successfulOcgCardIds` としてマークする。
-- いずれかの画像でダウンロード・アップロードエラーが発生した場合は `failedOcgCardIds` に追加し、詳細なエラーメッセージを記録する。
+- 1 枚のカード画像に紐づくすべてのバリエーション（Small/Large/Cropped）の S3 転送が成功した場合に、その `neuron_id` を `successfulNeuronCardIds` としてマークする。
+- いずれかの画像でダウンロード・アップロードエラーが発生した場合は `failedNeuronCardIds` に追加し、詳細なエラーメッセージを記録する。
 
 ### 4.5 Step 5: DB レコードの更新
 - **トランザクション境界原則 ([docs/X_important/lambda/rules/01_transaction_boundary_rules.md](../X_important/lambda/rules/01_transaction_boundary_rules.md)) の厳格遵守**:
@@ -230,4 +230,4 @@ type StorageClient interface {
    - `StorageClient` のモック（TestStorageClient）を作成し、外部 S3 に接続することなく UseCase の突合ロジック、スキップ判定、DB更新フローをテストする。
 2. **リトライと部分失敗**:
    - 個別カードの画像同期が失敗した場合でも、リクエスト全体の処理は中断せず、残りのカードの同期を継続する。
-   - 失敗したカード ID と原因はレスポンスの `failedOcgCardIds` および `errors` に格納して返却する。
+   - 失敗したカード ID と原因はレスポンスの `failedNeuronCardIds` および `errors` に格納して返却する。

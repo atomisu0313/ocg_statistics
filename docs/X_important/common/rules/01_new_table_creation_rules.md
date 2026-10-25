@@ -8,11 +8,16 @@
 ## 遵守ルール一覧
 
 1. **マイグレーションは必ず Up / Down 両方を作成し、スクリプトでロールバックまで検証する**
-   - [database/migrate/db/migrations/](../../../../database/migrate/db/migrations) に連番で `.up.sql` と `.down.sql` を作成する。
+   - [database/migrate/db/migrations/](../../../../database/migrate/db/migrations) に連番で `.up.sql` と `.down.sql` を作成（または初期 DDL `000001_init_ddl.*.sql` を更新）する。
+   - `down.sql` 作成時は、外部キー依存（`FOREIGN KEY ... REFERENCES parent(id)`）を考慮し、**親テーブルより先に子テーブルを DROP する**こと。
    - [local_migration_up.sh](../../../../scripts/database/local_migration_up.sh) と [local_migration_down.sh](../../../../scripts/database/local_migration_down.sh) の両方を実行し、問題なく元に戻せることを確認する。
 
-2. **sqlc の `schema.sql` への DDL 同期とコード再生成を必ず行う**
-   - [code/cardApiCall/infoInsert/sqlc/db/schema.sql](../../../../code/cardApiCall/infoInsert/sqlc/db/schema.sql) にテーブル定義を追加し、`sqlc/queries/` にクエリを記述した上で `sqlc generate` を実行する。
+2. **ローカル初期化 DDL (`02-init.sql`) および sqlc の `schema.sql` への DDL 同期とコード再生成を必ず行う**
+   - 新規テーブル作成・カラム変更時は、以下の 3 箇所すべてに同一の DDL を同期する：
+     1. [database/migrate/db/migrations/](../../../../database/migrate/db/migrations) (`*.up.sql` / `*.down.sql`)
+     2. [database/localsetup/sql/02-init.sql](../../../../database/localsetup/sql/02-init.sql)（ローカル Docker 環境の初期化 DDL）
+     3. [code/cardApiCall/internal/sqlc/db/schema.sql](../../../../code/cardApiCall/internal/sqlc/db/schema.sql)（sqlc スキーマ定義）
+   - 同期後、`sqlc/queries/` にクエリを記述した上で `sqlc generate` を実行する。
 
 3. **Entity を排し、DTO を防波堤として sqlc の型（`sql.Null*`）をカプセル化する**
    - 振る舞いのない無意味な Entity 層（`domain/`）を増やして多重詰め替えを行わない（[05_dto_design_policy.md](../../../02_go_architecture/05_dto_design_policy.md) 参照）。
@@ -106,11 +111,13 @@ func (u *neonUseCaseImpl) GetCardPack(ctx context.Context, id int64) (CardPackDT
 
 ## 実装チェックリスト
 
-- [ ] `database/migrate/db/migrations/` に連番の `.up.sql` と `.down.sql` の両方を作成したか？
+- [ ] `database/migrate/db/migrations/` に連番の `.up.sql` と `.down.sql`（または初期 DDL）を作成・更新したか？
+- [ ] `down.sql` で外部キー制約に配慮し、子テーブルから先に DROP しているか？
+- [ ] `database/localsetup/sql/02-init.sql`（ローカル初期化用）に同一の DDL を同期したか？
 - [ ] ローカル環境で `local_migration_up.sh` と `local_migration_down.sh` の両方を実行して検証したか？
 - [ ] `sqlc/db/schema.sql` にテーブル定義を追加し、`sqlc generate` を実行したか？
 - [ ] DTO で `sql.Null*` 型を吸収し、sqlc の型を外部に露出させていないか？
 - [ ] UseCase の更新系で `ExecTx`、参照系で `ExecNonTx` を使用しているか？
 - [ ] 全パッケージ（DTO / Repository / UseCase）の単体テストを作成したか？
-- [ ] テストスクリプト `bash scripts/code/cardApiCall/infoinsert/test_all.sh` を実行してすべて PASS したか？
+- [ ] テストスクリプト `bash scripts/code/cardApiCall/test_all.sh` を実行してすべて PASS したか？
 - [ ] [docs/01_data_prepare/card_class_diagram.md](../../../01_data_prepare/card_class_diagram.md) のクラス図および対応表を更新したか？

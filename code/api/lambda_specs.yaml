@@ -235,43 +235,43 @@ paths:
       requestBody:
         description: |
           syncStorageImageWithDB 関数の入力 JSON ペイロード仕様。
-          S3 への画像ストリーム転送および DB 更新を行う対象の親カード OCG ID リスト (`ocgCardIds`) を指定します。
+          S3 への画像ストリーム転送および DB 更新を行う対象の親カード Neuron CID リスト (`neuronCardIds`) を指定します。
         required: true
         content:
           application/json:
             schema:
               type: object
               required:
-                - ocgCardIds
+                - neuronCardIds
               properties:
-                ocgCardIds:
+                neuronCardIds:
                   type: array
                   minItems: 1
                   description: |
-                    画像同期対象とする親カードの OCG ID (`ocg_api_id`) の配列。
+                    画像同期対象とする親カードの Neuron CID (`cards.neuron_id`) の配列。
                     - 型: 64bit 整数の配列 (`array[integer(int64)]`)
                     - 必須: 必須 (`required: true`)
                     - 制約: 要素数 1 以上の配列 (`minItems: 1`)、各要素 `> 0`
                     - バリデーションルール:
-                      - 配列が空（`len(ocgCardIds) == 0`）または未指定（`null`）の場合、ハンドラー冒頭でバリデーションエラー (`ocgCardIds must not be empty`) が発生し、Lambda 関数エラー（Function Error）として即座に中断されます。
+                      - 配列が空（`len(neuronCardIds) == 0`）または未指定（`null`）の場合、ハンドラー冒頭でバリデーションエラー (`neuronCardIds must not be empty`) が発生し、Lambda 関数エラー（Function Error）として即座に中断されます。
                       - JSON のアンマーシャル失敗時は `failed to unmarshal request event: ...` を返却します。
                   items:
                     type: integer
                     format: int64
                     minimum: 1
-                    description: 同期対象親カードの OCG ID (`ocg_api_id`)
-                  example: [89631139, 46986414]
+                    description: 同期対象親カードの Neuron CID (`cards.neuron_id`)
+                  example: [4000, 4001]
             examples:
               multiCards:
                 summary: 複数カード指定 (標準同期)
-                description: カード ID 89631139 と 46986414 の画像を同期
+                description: カード Neuron CID 4000 と 4001 の画像を同期
                 value:
-                  ocgCardIds: [89631139, 46986414]
+                  neuronCardIds: [4000, 4001]
               singleCard:
                 summary: 単一カード指定
-                description: カード ID 89631139 のみ同期
+                description: カード Neuron CID 4000 のみ同期
                 value:
-                  ocgCardIds: [89631139]
+                  neuronCardIds: [4000]
       responses:
         '200':
           description: |
@@ -283,8 +283,8 @@ paths:
                 type: object
                 required:
                   - totalProcessedCards
-                  - successfulOcgCardIds
-                  - failedOcgCardIds
+                  - successfulNeuronCardIds
+                  - failedNeuronCardIds
                   - syncedImageCount
                   - skippedImageCount
                   - errors
@@ -292,22 +292,22 @@ paths:
                   totalProcessedCards:
                     type: integer
                     minimum: 0
-                    description: リクエストされた対象カードの総件数 (`len(ocgCardIds)`)。
+                    description: リクエストされた対象カードの総件数 (`len(neuronCardIds)`)。
                     example: 2
-                  successfulOcgCardIds:
+                  successfulNeuronCardIds:
                     type: array
-                    description: 全バリエーション（Small/Large/Cropped）の画像同期または検証が完全に成功したカード ID の配列。
+                    description: 全バリエーション（Small/Large/Cropped）の画像同期または検証が完全に成功したカードの Neuron CID 配列。
                     items:
                       type: integer
                       format: int64
-                    example: [89631139]
-                  failedOcgCardIds:
+                    example: [4000]
+                  failedNeuronCardIds:
                     type: array
-                    description: 画像同期、S3 ストリーム転送、または DB 更新のいずれかで失敗したカード ID の配列。
+                    description: 画像同期、S3 ストリーム転送、または DB 更新のいずれかで失敗したカードの Neuron CID 配列。
                     items:
                       type: integer
                       format: int64
-                    example: [46986414]
+                    example: [4001]
                   syncedImageCount:
                     type: integer
                     minimum: 0
@@ -328,8 +328,8 @@ paths:
                   summary: 全件同期成功
                   value:
                     totalProcessedCards: 1
-                    successfulOcgCardIds: [89631139]
-                    failedOcgCardIds: []
+                    successfulNeuronCardIds: [4000]
+                    failedNeuronCardIds: []
                     syncedImageCount: 3
                     skippedImageCount: 0
                     errors: []
@@ -337,26 +337,26 @@ paths:
                   summary: 一部カードでストリーム取得または S3 転送失敗
                   value:
                     totalProcessedCards: 2
-                    successfulOcgCardIds: [89631139]
-                    failedOcgCardIds: [46986414]
+                    successfulNeuronCardIds: [4000]
+                    failedNeuronCardIds: [4001]
                     syncedImageCount: 3
                     skippedImageCount: 0
                     errors:
-                      - ocgCardId: 46986414
+                      - neuronCardId: 4001
                         ocgApiImageId: 46986414
                         message: "failed to stream image to S3: connection timeout"
         '400':
           description: |
-            バリデーションエラー (`ocgCardIds` が空) または JSON パース失敗時（Lambda Function Error: Unhandled）。
+            バリデーションエラー (`neuronCardIds` が空) または JSON パース失敗時（Lambda Function Error: Unhandled）。
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/LambdaFunctionError'
               examples:
-                emptyOcgCardIds:
-                  summary: ocgCardIds 空配列バリデーションエラー
+                emptyNeuronCardIds:
+                  summary: neuronCardIds 空配列バリデーションエラー
                   value:
-                    errorMessage: "ocgCardIds must not be empty"
+                    errorMessage: "neuronCardIds must not be empty"
                     errorType: "*errors.errorString"
                 invalidJson:
                   summary: JSON パースエラー
@@ -444,33 +444,33 @@ components:
     SyncImagesInput:
       type: object
       required:
-        - ocgCardIds
+        - neuronCardIds
       description: syncStorageImageWithDB 関数の入力イベントペイロード
       properties:
-        ocgCardIds:
+        neuronCardIds:
           type: array
           minItems: 1
-          description: 画像同期対象とする親カードの OCG ID (`ocg_api_id`) リスト。要素数 1 以上の配列が必須。
+          description: 画像同期対象とする親カードの Neuron CID (`cards.neuron_id`) リスト。要素数 1 以上の配列が必須。
           items:
             type: integer
             format: int64
             minimum: 1
-            description: 対象親カードの OCG ID
-          example: [89631139, 46986414]
+            description: 対象親カードの Neuron CID
+          example: [4000, 4001]
 
     SyncError:
       type: object
       required:
-        - ocgCardId
+        - neuronCardId
         - ocgApiImageId
         - message
       description: 画像同期中に発生した個別カード・個別画像単位のエラー詳細レコード
       properties:
-        ocgCardId:
+        neuronCardId:
           type: integer
           format: int64
-          description: エラーが発生した対象カードの OCG ID (`ocg_api_id`)。
-          example: 46986414
+          description: エラーが発生した対象カードの Neuron CID (`cards.neuron_id`)。
+          example: 4001
         ocgApiImageId:
           type: integer
           format: int64
@@ -485,8 +485,8 @@ components:
       type: object
       required:
         - totalProcessedCards
-        - successfulOcgCardIds
-        - failedOcgCardIds
+        - successfulNeuronCardIds
+        - failedNeuronCardIds
         - syncedImageCount
         - skippedImageCount
         - errors
@@ -495,22 +495,22 @@ components:
         totalProcessedCards:
           type: integer
           minimum: 0
-          description: リクエストで渡され処理対象となった親カードの総件数（`len(ocgCardIds)`）。
+          description: リクエストで渡され処理対象となった親カードの総件数（`len(neuronCardIds)`）。
           example: 2
-        successfulOcgCardIds:
+        successfulNeuronCardIds:
           type: array
-          description: 全ての画像バリエーション（Small/Large/Cropped）の同期または検証が完全に成功したカード ID の配列。
+          description: 全ての画像バリエーション（Small/Large/Cropped）の同期または検証が完全に成功したカードの Neuron CID 配列。
           items:
             type: integer
             format: int64
-          example: [89631139]
-        failedOcgCardIds:
+          example: [4000]
+        failedNeuronCardIds:
           type: array
-          description: 画像同期、S3 ストリーム転送、または DB 更新のいずれかで失敗したカード ID の配列。
+          description: 画像同期、S3 ストリーム転送、または DB 更新のいずれかで失敗したカードの Neuron CID 配列。
           items:
             type: integer
             format: int64
-          example: [46986414]
+          example: [4001]
         syncedImageCount:
           type: integer
           minimum: 0

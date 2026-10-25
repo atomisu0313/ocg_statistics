@@ -98,13 +98,32 @@ https://images.example.com/cards/cropped/{ocg_api_image_id}.jpg
 
 ---
 
-## 5. 同期ワーカー（画像ダウンロード & S3 配置）の選定比較
+## 5. 同期ワーカー（画像ダウンロード & S3 配置）の選定とAirflow連携構成
 
-| 方式 | 特徴 | メリット | デメリット | 推奨度 |
-| :--- | :--- | :--- | :--- | :--- |
-| **A. Airflow Python Task** | 既存の Airflow DAG（`db_insert.py` の後続）で実行 | 既存インフラ・タスク依存関係（DB挿入後に即キック）をそのまま活用可能。大量ダウンロードもタイムアウトを気にせずバッチ処理できる | ワーカーコンテナのネットワーク負荷 | **◎ 最適（第1推奨）** |
-| **B. 専用 Go/Python Lambda** | SQS 等をトリガーにして画像単位で並列処理 | 超並列で高速 | 大量カード（数千枚）登録時に Lambda 同時実行数制限や外部 CDN 側の IP Ban / レートリミットに引っかかるリスク | △ |
-| **C. `infoInsert` 内で同期実行** | カード登録と同時にダウンロードして S3 へ PUT | 1つの Lambda で完結 | カード登録のレイテンシが爆発的に増加。Lambda 15分タイムアウト、DBトランザクション長時間保持のリスク | ✕ 禁止 |
+### 5.1 方式の選定経緯
+画像同期処理は、ストリーミングアップロードと高速な並行処理が求められるため、専用の Go Lambda（`syncStorageImageWithDB`）として実装されている。
+Airflow（`ocg_db_insert` DAG）では、**DB インサートタスク（`invoke_lambda_function`）の直後に画像同期タスク（`invoke_sync_image_lambda`）を直列にキックする方針**を採用している。
 
-**結論**:
-`infoInsert` ではメタデータ（URL）の DB 登録までを高速に行い、**画像ダウンロード・S3 配置は Airflow の後続タスク（PythonOperator / TaskFlow API）として非同期バッチ実行する方式**を採用する。
+```mermaid
+flowchart LR
+    Start(["start"]) --> Fetch["start_fetch_param"]
+    Fetch --> GetParams["get_current_id<br/>get_delta_id<br/>get_max_id"]
+    GetParams --> GenIDs["generate_card_ids<br/>(ocgCardIds配列生成)"]
+    GetParams --> Branch{"choose_branch_path<br/>(上限超過チェック)"}
+    Branch -->|"超過"| Alarm["alarm_excess_id"]
+    Branch -->|"正常"| InsertLambda["invoke_lambda_function<br/>(cardInfoInsert Lambda)"]
+    GenIDs -.->|"ocgCardIds"| InsertLambda
+    InsertLambda --> SyncLambda["invoke_sync_image_lambda<br/>(syncStorageImageWithDB Lambda)"]
+    GenIDs -.->|"neuronCardIds"| SyncLambda
+    SyncLambda --> UpdateID["update_current_id<br/>(SSM更新)"]
+    Alarm --> EndUpdate["end_update_task"]
+    UpdateID --> EndUpdate
+    EndUpdate --> End(["end"])
+```
+
+### 5.2 各タスクの責務
+1. **`generate_card_ids`**: SSM から取得した `current_id` と `delta_id` より、処理対象のカード ID 配列（Neuron CID 整数配列）を一意に生成し XCom へ渡す。
+2. **`invoke_lambda_function`**: `cardInfoInsert` Lambda を呼び出し、Neuron DB / YGOPRODeck API からカード基本情報・詳細情報および画像メタデータ（URL）を Neon DB へ INSERT する。
+3. **`invoke_sync_image_lambda`**: インサート直後に `syncStorageImageWithDB` Lambda を呼び出し、同一の Neuron CID 配列（`neuronCardIds`）を対象として外部 CDN から実体画像を S3 へストリーム保存し、DB の配信 URL（`image_url_*_this_app`）を更新する。
+4. **`update_current_id`**: 画像同期まで完了した後に、次回開始 ID（`current_id + delta_id`）を SSM Parameter Store に書き戻す。
+

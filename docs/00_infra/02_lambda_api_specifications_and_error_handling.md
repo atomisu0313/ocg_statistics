@@ -50,5 +50,5 @@ curl -s -X POST "http://localhost:9002/2015-03-31/functions/function/invocations
 # 3. syncStorageImageWithDB (ポート 9003)
 curl -s -X POST "http://localhost:9003/2015-03-31/functions/function/invocations" \
   -H "Content-Type: application/json" \
-  -d '{"ocgCardIds": [89631139, 46986414]}'
+  -d '{"neuronCardIds": [4000, 4001]}'
 ```
